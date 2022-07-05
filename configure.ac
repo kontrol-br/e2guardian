@@ -595,7 +595,7 @@ else
 	AC_MSG_RESULT(yes)
 	dnsauth=true
 	DNSAUTHSUPPORT=""
-	LIBS="${LIBS} -lresolv"
+	LIBS="${LIBS}"
 	AC_DEFINE([PRT_DNSAUTH],[],[Define to enable DNS auth plugin])
 fi],
 [
