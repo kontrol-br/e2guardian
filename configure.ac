@@ -561,7 +561,7 @@ sslmitm,
 [AC_HELP_STRING([--enable-sslmitm@<:@=no@:>@], [Enable support for the SSL MITM plugin])],
 [ if test "x$enableval" = "xno"; then
 	AC_MSG_RESULT(no)
-	sslmitm=falselibpcre >= 6.0
+	sslmitm=false
 	SSLMITMSUPPORT="!! Not compiled !! "
 else
 	AC_MSG_RESULT(yes)
