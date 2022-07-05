@@ -266,7 +266,7 @@ AC_MSG_RESULT(yes)
 )
 
 if test "x$pcre" = "xtrue"; then
-PKG_CHECK_MODULES([PCRE],[libpcre >= 6.0])
+PKG_CHECK_MODULES "([PCRE],[libpcre >= 6.0])"
 AC_DEFINE([HAVE_PCRE],[],[Define to enable PCRE support])
 PCRE_LIBS="-lpcreposix ${PCRE_LIBS}"
 else
@@ -561,7 +561,7 @@ sslmitm,
 [AC_HELP_STRING([--enable-sslmitm@<:@=no@:>@], [Enable support for the SSL MITM plugin])],
 [ if test "x$enableval" = "xno"; then
 	AC_MSG_RESULT(no)
-	sslmitm=false
+	sslmitm=falselibpcre >= 6.0
 	SSLMITMSUPPORT="!! Not compiled !! "
 else
 	AC_MSG_RESULT(yes)
@@ -570,7 +570,7 @@ else
 	LIBS="${LIBS} -lssl -lcrypto"
 	AC_DEFINE([__SSLMITM],[],[Define to enable SSL MITM ])
 	AC_DEFINE([__SSLCERT],[],[Define to enable SSL CERT ])
-	PKG_CHECK_MODULES([OPENSSL],[ openssl >= 1.0.1])
+	PKG_CHECK_MODULES "([OPENSSL],[ openssl >= 1.0.1])"
 fi],
 [
 	AC_MSG_RESULT(no)
