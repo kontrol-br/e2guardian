@@ -471,7 +471,11 @@ int BaseSocket::getLine(char *buff, int size, int timeout, bool honour_reloadcon
 bool BaseSocket::writeString(const char *line) //throw(std::exception)
 {
     int l = strlen(line);
-    return writeToSocket(line, l, 0, timeout);
+    if (!writeToSocket(line, l, 0, timeout)) {
+        return false;
+//        throw std::runtime_error(std::string("Can't write to socket: ") + strerror(errno));
+    }
+    return true;
 }
 
 // write data to socket - throws exception on failure, can be told to break on config reloads
@@ -481,6 +485,7 @@ void BaseSocket::writeToSockete(const char *buff, int len, unsigned int flags, i
     if (!writeToSocket(buff, len, flags, timeout, honour_reloadconfig)) {
         throw std::runtime_error(std::string("Can't write to socket: ") + strerror(errno));
     }
+    return true;
 }
 
 // write data to socket - can be told not to do an initial readyForOutput, and to break on config reloads
