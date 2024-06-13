@@ -478,12 +478,13 @@ bool BaseSocket::writeString(const char *line) //throw(std::exception)
     return true;
 }
 
-// write data to socket - throws exception on failure, can be told to break on config reloads
-//void BaseSocket::writeToSockete(const char *buff, int len, unsigned int flags, int timeout, bool honour_reloadconfig) throw(std::exception)
-void BaseSocket::writeToSockete(const char *buff, int len, unsigned int flags, int timeout, bool honour_reloadconfig)
+// write line to socket
+bool BaseSocket::writeString(const char *line) //throw(std::exception)
 {
-    if (!writeToSocket(buff, len, flags, timeout, honour_reloadconfig)) {
-        throw std::runtime_error(std::string("Can't write to socket: ") + strerror(errno));
+    int l = strlen(line);
+    if (!writeToSocket(line, l, 0, timeout)) {
+        return false;
+//        throw std::runtime_error(std::string("Can't write to socket: ") + strerror(errno));
     }
     return true;
 }
