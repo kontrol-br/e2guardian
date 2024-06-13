@@ -247,16 +247,16 @@ bool DataBuffer::out(Socket *sock) //throw(std::exception)
 {
     if (dontsendbody) {
 #ifdef DGDEBUG
-        std::cerr << thread_id << "dontsendbody true; not sending" << std::endl;
+        std::cout << "dontsendbody true; not sending" << " Line: " << __LINE__ << " Function: " << __func__ << std::endl;
 #endif
         return true;
     }
-    if (!(*sock).breadyForOutput(timeout)) return false; // exceptions on timeout or error
+    if (!(*sock).breadyForOutput(stimeout)) return false; // exceptions on timeout or error
 
     if (tempfilefd > -1) {
 // must have been too big for ram so stream from disk in blocks
 #ifdef DGDEBUG
-        std::cerr << thread_id << "Sending " << tempfilesize - bytesalreadysent << " bytes from temp file (" << bytesalreadysent << " already sent)" << std::endl;
+        std::cout << "Sending " << tempfilesize - bytesalreadysent << " bytes from temp file (" << bytesalreadysent << " already sent)" << " Line: " << __LINE__ << " Function: " << __func__ << std::endl;
 #endif
         off_t sent = bytesalreadysent;
         int rc;
@@ -264,98 +264,59 @@ bool DataBuffer::out(Socket *sock) //throw(std::exception)
         if (lseek(tempfilefd, bytesalreadysent, SEEK_SET) < 0)
             return false;
 //            throw std::runtime_error(std::string("Can't write to socket: ") + strerror(errno));
-         int block_len;
-        if(chunked)
-            block_len = 4048;
-        else
-            block_len = buffer_length;
 
         while (sent < tempfilesize) {
-            rc = readEINTR(tempfilefd, data, block_len);
+            rc = readEINTR(tempfilefd, data, buffer_length);
 #ifdef DGDEBUG
-            std::cerr << thread_id << "reading temp file rc:" << rc << std::endl;
+            std::cout << "reading temp file rc:" << rc << " Line: " << __LINE__ << " Function: " << __func__ << std::endl;
 #endif
             if (rc < 0) {
 #ifdef DGDEBUG
-                std::cerr << thread_id << "error reading temp file so throwing exception" << std::endl;
+                std::cout << "error reading temp file so throwing exception" << " Line: " << __LINE__ << " Function: " << __func__ << std::endl;
 #endif
                 return false;
     //            throw std::exception();
             }
             if (rc == 0) {
 #ifdef DGDEBUG
-                std::cerr << thread_id << "got zero bytes reading temp file" << std::endl;
+                std::cout << "got zero bytes reading temp file" << " Line: " << __LINE__ << " Function: " << __func__ << std::endl;
 #endif
                 break; // should never happen
             }
             // as it's cached to disk the buffer must be reasonably big
-            if(chunked) {
-                if (!sock->writeChunk(data, rc, timeout))
-                    return false;
-            } else {
-                if (!sock->writeToSocket(data, rc, 0, timeout)) {
-                    return false;
-                }
+            if (!sock->writeToSocket(data, rc, 0, stimeout)) {
+                return false;
+//                throw std::runtime_error(std::string("Can't write to socket: ") + strerror(errno));
             }
             sent += rc;
 #ifdef DGDEBUG
-            std::cerr << thread_id << "total sent from temp:" << sent << std::endl;
+            std::cout << "total sent from temp:" << sent << " Line: " << __LINE__ << " Function: " << __func__ << std::endl;
 #endif
-        }
-        if (chunked && got_all) {
-            String n;
-            if (!sock->writeChunkTrailer(n))
-                return false;
         }
         close(tempfilefd);
         tempfilefd = -1;
         tempfilesize = 0;
         unlink(tempfilepath.toCharArray());
     } else {
-        off_t sent = bytesalreadysent;
 #ifdef DGDEBUG
-        std::cerr << thread_id << "Sending " << buffer_length - bytesalreadysent << " bytes from RAM (" << buffer_length << " in buffer; " << bytesalreadysent << " already sent)" << std::endl;
+        std::cout << "Sending " << buffer_length - bytesalreadysent << " bytes from RAM (" << buffer_length << " in buffer; " << bytesalreadysent << " already sent)" << " Line: " << __LINE__ << " Function: " << __func__ << std::endl;
 #endif
         // it's in RAM, so just send it, no streaming from disk
-        int block_len;
-        if(chunked)
-            block_len = 4048;
-        else
-            block_len = buffer_length;
-
         if (buffer_length != 0) {
-            while (sent < buffer_length) {
-                if( block_len > (buffer_length - sent))
-                    block_len = (buffer_length - sent);
-                if (chunked) {
-                    if (!sock->writeChunk(data + sent, block_len, timeout))
-                        return false;
-
-                } else {
-                    if (!sock->writeToSocket(data + sent, buffer_length - sent, 0, timeout))
-                        return false;
-                }
-                sent += block_len;
-            }
-            if (chunked && got_all) {
-                String n;
-                if (!sock->writeChunkTrailer(n))
-                    return false;
-            }
+            if (!sock->writeToSocket(data + bytesalreadysent, buffer_length - bytesalreadysent, 0, stimeout))
+                return false;
+          //      throw std::exception();
         } else {
-            if(chunked) {
-                if (!sock->writeChunk(data + bytesalreadysent, 0, timeout))
-                    return false;
-            } else {
-                if (!sock->writeToSocket("\r\n\r\n", 4, 0, timeout))
-                    return false;
-            }
+            if (!sock->writeToSocket("\r\n\r\n", 4, 0, stimeout))
+                return false;
+           //     throw std::exception();
         }
 #ifdef DGDEBUG
-        std::cerr << thread_id << "Sent " << buffer_length - bytesalreadysent << " bytes from RAM (" << buffer_length  << std::endl;
+        std::cout << "Sent " << buffer_length - bytesalreadysent << " bytes from RAM (" << buffer_length  << ") Line: " << __LINE__ << " Function: " << __func__ << std::endl;
 #endif
+     return true;
     }
-    return true;
+   return true;
 }
 
 // zlib decompression
