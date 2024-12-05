@@ -189,7 +189,7 @@ bool OptionContainer::read(std::string& filename, int type)
 		} else {
 			no_daemon = false;
 		}
-		
+
 		if (findoptionS("dockermode") == "on") {
 			no_daemon = true;
 			e2_front_log = true;
@@ -275,8 +275,8 @@ bool OptionContainer::read(std::string& filename, int type)
         }
 
         time_t gen_cert_start, gen_cert_end;
-        time_t def_start = 1417872951; // 6th Dec 2014
-        time_t ten_years = 315532800;
+        time_t def_start = 1728164194; // Thu Oct 05 2024 21:36:34
+        time_t ten_years = 2043696994;  // Thu Oct 05 2034 21:36:34
         gen_cert_start = findoptionI("generatedcertstart");
         if (gen_cert_start < def_start)
             gen_cert_start = def_start;
