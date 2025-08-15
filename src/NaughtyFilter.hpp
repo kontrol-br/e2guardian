@@ -14,6 +14,8 @@
 //#include "FOptionContainer.hpp"
 #include "UrlRec.hpp"
 
+#include <time.h>
+
 class FOptionContainer;
 
 // DECLARATIONS        bool isListCheck = false;
@@ -105,7 +107,7 @@ class NaughtyFilter
     int auth_result = 0;
     String search_words;
     String search_terms;
-    struct timeval thestart;
+    struct timespec thestart;
 
     // 0=none,1=first line,2=all
     int headersent = 0;

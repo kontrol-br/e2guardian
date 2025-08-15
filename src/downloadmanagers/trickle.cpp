@@ -19,7 +19,7 @@
 
 #include <string.h>
 #include <syslog.h>
-#include <sys/time.h>
+#include <time.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -109,9 +109,9 @@ int trickledm::in(DataBuffer *d, Socket *sock, Socket *peersock, class HTTPHeade
     bool swappedtodisk = false;
     bool doneinitialdelay = false;
 
-    struct timeval themdays;
-    struct timeval nowadays;
-    gettimeofday(&themdays, NULL);
+    struct timespec themdays;
+    struct timespec nowadays;
+    clock_gettime(CLOCK_MONOTONIC, &themdays);
 
     // buffer size for streaming downloads
     off_t blocksize = 32768;
@@ -127,9 +127,13 @@ int trickledm::in(DataBuffer *d, Socket *sock, Socket *peersock, class HTTPHeade
     while ((bytesremaining > 0) || geteverything) {
         // send keep-alive bytes here
         if (o.trickle_delay > 0) {
-            gettimeofday(&nowadays, NULL);
-            if (doneinitialdelay ? nowadays.tv_sec - themdays.tv_sec > o.trickle_delay : nowadays.tv_sec > o.initial_trickle_delay) {
-                themdays.tv_sec = nowadays.tv_sec;
+            clock_gettime(CLOCK_MONOTONIC, &nowadays);
+            long long diff_ns = (nowadays.tv_sec - themdays.tv_sec) * 1000000000LL +
+                                (nowadays.tv_nsec - themdays.tv_nsec);
+            long long now_ns = nowadays.tv_sec * 1000000000LL + nowadays.tv_nsec;
+            if (doneinitialdelay ? diff_ns > (long long)o.trickle_delay * 1000000000LL :
+                                   now_ns > (long long)o.initial_trickle_delay * 1000000000LL) {
+                themdays = nowadays;
                 doneinitialdelay = true;
                 if ((*headersent) < 1) {
 #ifdef DGDEBUG

@@ -14,7 +14,7 @@
 
 #include <string.h>
 #include <syslog.h>
-#include <sys/time.h>
+#include <time.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <iostream>
@@ -174,11 +174,11 @@ int fancydm::in(DataBuffer *d, Socket *sock, Socket *peersock, class HTTPHeader 
 
     bool swappedtodisk = false;
 
-    struct timeval starttime;
-    struct timeval themdays;
-    struct timeval nowadays;
-    gettimeofday(&themdays, NULL);
-    gettimeofday(&starttime, NULL);
+    struct timespec starttime;
+    struct timespec themdays;
+    struct timespec nowadays;
+    clock_gettime(CLOCK_MONOTONIC, &themdays);
+    clock_gettime(CLOCK_MONOTONIC, &starttime);
 
     toobig_unscanned = false;
     toobig_notdownloaded = false;
@@ -209,12 +209,17 @@ int fancydm::in(DataBuffer *d, Socket *sock, Socket *peersock, class HTTPHeader 
     while ((bytesgot < expectedsize) || geteverything) {
         // send text header to show status
         if (o.trickle_delay > 0) {
-            gettimeofday(&nowadays, NULL);
-            timeelapsed = nowadays.tv_sec - starttime.tv_sec;
-            if ((!initialsent && timeelapsed > o.initial_trickle_delay) || (initialsent && nowadays.tv_sec - themdays.tv_sec > o.trickle_delay)) {
+            clock_gettime(CLOCK_MONOTONIC, &nowadays);
+            long long timeelapsed_ns = (nowadays.tv_sec - starttime.tv_sec) * 1000000000LL +
+                                      (nowadays.tv_nsec - starttime.tv_nsec);
+            timeelapsed = timeelapsed_ns / 1000000000;
+            long long diff_ns = (nowadays.tv_sec - themdays.tv_sec) * 1000000000LL +
+                                (nowadays.tv_nsec - themdays.tv_nsec);
+            if ((!initialsent && timeelapsed_ns > (long long)o.initial_trickle_delay * 1000000000LL) ||
+                (initialsent && diff_ns > (long long)o.trickle_delay * 1000000000LL)) {
                 initialsent = true;
-                bytessec = bytesgot / timeelapsed;
-                themdays.tv_sec = nowadays.tv_sec;
+                bytessec = timeelapsed > 0 ? bytesgot / timeelapsed : 0;
+                themdays = nowadays;
                 if ((*headersent) < 1) {
 #ifdef DGDEBUG
                     std::cout << "sending header for text status" << std::endl;

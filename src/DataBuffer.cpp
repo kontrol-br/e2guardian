@@ -19,7 +19,7 @@
 #include <zlib.h>
 #include <cerrno>
 #include <fstream>
-#include <sys/time.h>
+#include <time.h>
 #include <queue>
 #include <istream>
 
@@ -139,9 +139,9 @@ int DataBuffer::bufferReadFromSocket(Socket *sock, char *buffer, int size, int s
 
     int pos = 0;
     int rc;
-    struct timeval starttime;
-    struct timeval nowadays;
-    gettimeofday(&starttime, NULL);
+    struct timespec starttime;
+    struct timespec nowadays;
+    clock_gettime(CLOCK_MONOTONIC, &starttime);
     while (pos < size) {
         if (chunked) {
             rc = sock->readChunk(&buffer[pos], size - pos,sockettimeout );
@@ -156,8 +156,10 @@ int DataBuffer::bufferReadFromSocket(Socket *sock, char *buffer, int size, int s
             return rc; // just return with the return code
         }
         pos += rc;
-        gettimeofday(&nowadays, NULL);
-        if (nowadays.tv_sec - starttime.tv_sec > stimeout) {
+        clock_gettime(CLOCK_MONOTONIC, &nowadays);
+        long long diff_ns = (nowadays.tv_sec - starttime.tv_sec) * 1000000000LL +
+                            (nowadays.tv_nsec - starttime.tv_nsec);
+        if (diff_ns > (long long)stimeout * 1000000000LL) {
 #ifdef DGDEBUG
             std::cerr << thread_id << "buffered socket read more than timeout" << std::endl;
 #endif

@@ -12,6 +12,7 @@
 #include <syslog.h>
 #include <csignal>
 #include <ctime>
+#include <time.h>
 #include <sys/stat.h>
 #include <pwd.h>
 #include <cerrno>
@@ -690,7 +691,7 @@ void log_listener(std::string log_location, bool logconerror, bool logsyslog, Qu
     std::string stype, postdata;
     int port = 80, isnaughty = 0, isexception = 0, code = 200, naughtytype = 0;
     int cachehit = 0, wasinfected = 0, wasscanned = 0, filtergroup = 0;
-    long tv_sec = 0, tv_usec = 0;
+    long tv_sec = 0, tv_nsec = 0;
     int contentmodified = 0, urlmodified = 0, headermodified = 0;
     int headeradded = 0;
 
@@ -837,7 +838,7 @@ void log_listener(std::string log_location, bool logconerror, bool logsyslog, Qu
                     tv_sec = atol(logline.c_str());
                     break;
                 case 22:
-                    tv_usec = atol(logline.c_str());
+                    tv_nsec = atol(logline.c_str());
                     break;
                 case 23:
                     clienthost = s;
@@ -937,13 +938,13 @@ void log_listener(std::string log_location, bool logconerror, bool logsyslog, Qu
         }
 
         std::string builtline, year, month, day, hour, min, sec, when, vbody, utime;
-        struct timeval theend;
+        struct timespec theend;
 
         // create a string representation of UNIX timestamp if desired
         if (o.log_timestamp || (o.log_file_format == 3)
             || (o.log_file_format > 4)) {
-            gettimeofday(&theend, NULL);
-            String temp((int) (theend.tv_usec / 1000));
+            clock_gettime(CLOCK_MONOTONIC, &theend);
+            String temp((int) (theend.tv_nsec / 1000000));
             while (temp.length() < 3) {
                 temp = "0" + temp;
             }
@@ -1001,11 +1002,10 @@ void log_listener(std::string log_location, bool logconerror, bool logsyslog, Qu
             case 3: {
                 // as certain bits of info are logged in format 3, their creation is best done here, not in all cases.
                 std::string duration, hier, hitmiss;
-                long durationsecs, durationusecs;
-                durationsecs = (theend.tv_sec - tv_sec);
-                durationusecs = theend.tv_usec - tv_usec;
-                durationusecs = (durationusecs / 1000) + durationsecs * 1000;
-                String temp((int) durationusecs);
+                long long durationnsecs = (theend.tv_sec - tv_sec) * 1000000000LL +
+                                          (theend.tv_nsec - tv_nsec);
+                long durationmsecs = durationnsecs / 1000000;
+                String temp((int) durationmsecs);
                 while (temp.length() < 6) {
                     temp = " " + temp;
                 }
@@ -1049,11 +1049,10 @@ void log_listener(std::string log_location, bool logconerror, bool logsyslog, Qu
             case 6:
             default:
                 std::string duration;
-                long durationsecs, durationusecs;
-                durationsecs = (theend.tv_sec - tv_sec);
-                durationusecs = theend.tv_usec - tv_usec;
-                durationusecs = (durationusecs / 1000) + durationsecs * 1000;
-                String temp((int) durationusecs);
+                long long durationnsecs = (theend.tv_sec - tv_sec) * 1000000000LL +
+                                          (theend.tv_nsec - tv_nsec);
+                long durationmsecs = durationnsecs / 1000000;
+                String temp((int) durationmsecs);
                 duration = temp;
 
                 builtline = utime + "\t"

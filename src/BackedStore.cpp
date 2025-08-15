@@ -23,7 +23,7 @@
 
 #include <sys/stat.h>
 #include <sys/mman.h>
-#include <sys/time.h>
+#include <time.h>
 
 #include "BackedStore.hpp"
 
@@ -209,12 +209,12 @@ std::string BackedStore::store(const char *prefix)
         // Try creating a hardlink with the new name and see what happens
         std::ostringstream storedname;
         storedname << prefix;
-        timeval tv;
-        // Use time of day (in microsecond resolution) to try and generate
+        struct timespec ts;
+        // Use monotonic clock time (in nanosecond resolution) to try and generate
         // a "random" name for the hardlink - tempnam doesn't allow arbitrary
         // prefixes (POSIX says up to 5 chars).
-        gettimeofday(&tv, NULL);
-        storedname << '-' << tv.tv_sec << tv.tv_usec << std::flush;
+        clock_gettime(CLOCK_MONOTONIC, &ts);
+        storedname << '-' << ts.tv_sec << ts.tv_nsec << std::flush;
 
         char *name = strrchr(filename, '/');
 #ifdef DGDEBUG
