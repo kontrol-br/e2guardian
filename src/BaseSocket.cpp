@@ -19,6 +19,9 @@
 #include <stdexcept>
 #include <syslog.h>
 #include <sys/select.h>
+#ifdef __FreeBSD__
+#include <sys/event.h>
+#endif
 
 #ifdef NETDEBUG
 #include <iostream>
@@ -228,6 +231,40 @@ bool BaseSocket::bcheckSForInput(int timeout)
     int rc;
     s_errno = 0;
     errno = 0;
+#ifdef __FreeBSD__
+    int kq = kqueue();
+    if (kq == -1) {
+        s_errno = errno;
+        sockerr = true;
+        return false;
+    }
+    struct kevent change;
+    struct kevent event;
+    EV_SET(&change, sck, EVFILT_READ, EV_ADD | EV_ENABLE, 0, 0, NULL);
+    struct timespec ts;
+    ts.tv_sec = timeout / 1000;
+    ts.tv_nsec = (timeout % 1000) * 1000000;
+    rc = kevent(kq, &change, 1, &event, 1, &ts);
+    close(kq);
+    if (rc == 0) {
+        timedout = true;
+        return false;
+    }
+    timedout = false;
+    if (rc < 0 || (event.flags & EV_ERROR)) {
+        s_errno = (rc < 0) ? errno : event.data;
+        sockerr = true;
+        return false;
+    }
+    if (event.flags & EV_EOF) {
+        ishup = true;
+    }
+    if (event.filter == EVFILT_READ) {
+        return true;
+    }
+    sockerr = true;
+    return false;
+#else
     rc = poll(infds, 1, timeout);
     if (rc == 0)
     {
@@ -249,6 +286,7 @@ bool BaseSocket::bcheckSForInput(int timeout)
     }
     sockerr = true;
     return false;   // must be POLLERR or POLLNVAL
+#endif
 }
 
 // blocking check to see if there is data waiting on socket
@@ -261,6 +299,40 @@ bool BaseSocket::bcheckForInput(int timeout)
     int rc;
     s_errno = 0;
     errno = 0;
+#ifdef __FreeBSD__
+    int kq = kqueue();
+    if (kq == -1) {
+        s_errno = errno;
+        sockerr = true;
+        return false;
+    }
+    struct kevent change;
+    struct kevent event;
+    EV_SET(&change, sck, EVFILT_READ, EV_ADD | EV_ENABLE, 0, 0, NULL);
+    struct timespec ts;
+    ts.tv_sec = timeout / 1000;
+    ts.tv_nsec = (timeout % 1000) * 1000000;
+    rc = kevent(kq, &change, 1, &event, 1, &ts);
+    close(kq);
+    if (rc == 0) {
+        timedout = true;
+        return false;
+    }
+    timedout = false;
+    if (rc < 0 || (event.flags & EV_ERROR)) {
+        s_errno = (rc < 0) ? errno : event.data;
+        sockerr = true;
+        return false;
+    }
+    if (event.flags & EV_EOF) {
+        ishup = true;
+    }
+    if (event.filter == EVFILT_READ) {
+        return true;
+    }
+    sockerr = true;
+    return false;
+#else
     rc = poll(infds, 1, timeout);
     if (rc == 0)
     {
@@ -282,6 +354,7 @@ bool BaseSocket::bcheckForInput(int timeout)
     }
     sockerr = true;
     return false;   // must be POLLERR or POLLNVAL
+#endif
 }
 
 // blocking check for waiting data - blocks for up to given timeout, can be told to break on signal-triggered config reloads
@@ -294,6 +367,39 @@ bool BaseSocket::checkForInput()
     int rc;
     s_errno = 0;
     errno = 0;
+#ifdef __FreeBSD__
+    int kq = kqueue();
+    if (kq == -1) {
+        s_errno = errno;
+        sockerr = true;
+        return false;
+    }
+    struct kevent change;
+    struct kevent event;
+    EV_SET(&change, sck, EVFILT_READ, EV_ADD | EV_ENABLE, 0, 0, NULL);
+    struct timespec ts;
+    ts.tv_sec = 0;
+    ts.tv_nsec = 0;
+    rc = kevent(kq, &change, 1, &event, 1, &ts);
+    close(kq);
+    if (rc == 0) {
+        return false;
+    }
+    timedout = false;
+    if (rc < 0 || (event.flags & EV_ERROR)) {
+        s_errno = (rc < 0) ? errno : event.data;
+        sockerr = true;
+        return false;
+    }
+    if (event.flags & EV_EOF) {
+        ishup = true;
+    }
+    if (event.filter == EVFILT_READ) {
+        return true;
+    }
+    sockerr = true;
+    return false;
+#else
    rc = poll(infds, 1, 0);
     if (rc == 0)
         {
@@ -314,6 +420,7 @@ bool BaseSocket::checkForInput()
     }
     sockerr = true;
     return false;   // must be POLLERR or POLLNVAL
+#endif
 }
 
 
@@ -326,6 +433,38 @@ bool BaseSocket::readyForOutput()
     int rc;
     s_errno = 0;
     errno = 0;
+#ifdef __FreeBSD__
+    int kq = kqueue();
+    if (kq == -1) {
+        s_errno = errno;
+        sockerr = true;
+        return false;
+    }
+    struct kevent change;
+    struct kevent event;
+    EV_SET(&change, sck, EVFILT_WRITE, EV_ADD | EV_ENABLE, 0, 0, NULL);
+    struct timespec ts;
+    ts.tv_sec = 0;
+    ts.tv_nsec = 0;
+    rc = kevent(kq, &change, 1, &event, 1, &ts);
+    close(kq);
+    if (rc == 0) {
+        return false;
+    }
+    timedout = false;
+    if (rc < 0 || (event.flags & EV_ERROR)) {
+        s_errno = (rc < 0) ? errno : event.data;
+        sockerr = true;
+        return false;
+    }
+    if (event.flags & EV_EOF) {
+        ishup = true;
+    }
+    if (event.filter == EVFILT_WRITE) {
+        return true;
+    }
+    return false;
+#else
     rc = poll(outfds,1, 0);
     if (rc == 0)
     {
@@ -343,6 +482,7 @@ bool BaseSocket::readyForOutput()
     if (outfds[0].revents & POLLHUP)
         ishup = true;
     return false;
+#endif
 }
 
 bool BaseSocket::breadyForOutput(int timeout) {
@@ -351,6 +491,39 @@ bool BaseSocket::breadyForOutput(int timeout) {
     int rc;
     s_errno = 0;
     errno = 0;
+#ifdef __FreeBSD__
+    int kq = kqueue();
+    if (kq == -1) {
+        s_errno = errno;
+        sockerr = true;
+        return false;
+    }
+    struct kevent change;
+    struct kevent event;
+    EV_SET(&change, sck, EVFILT_WRITE, EV_ADD | EV_ENABLE, 0, 0, NULL);
+    struct timespec ts;
+    ts.tv_sec = timeout / 1000;
+    ts.tv_nsec = (timeout % 1000) * 1000000;
+    rc = kevent(kq, &change, 1, &event, 1, &ts);
+    close(kq);
+    if (rc == 0) {
+        timedout = true;
+        return false;
+    }
+    timedout = false;
+    if (rc < 0 || (event.flags & EV_ERROR)) {
+        s_errno = (rc < 0) ? errno : event.data;
+        sockerr = true;
+        return false;
+    }
+    if (event.flags & EV_EOF) {
+        ishup = true;
+    }
+    if (event.filter == EVFILT_WRITE) {
+        return true;
+    }
+    return false;
+#else
     rc = poll(outfds, 1, timeout);
     if (rc == 0) {
         timedout = true;
@@ -367,6 +540,7 @@ bool BaseSocket::breadyForOutput(int timeout) {
     if (outfds[0].revents & POLLHUP)
         ishup = true;
     return false;
+#endif
 }
 
 // read a line from the socket, can be told to break on config reloads
