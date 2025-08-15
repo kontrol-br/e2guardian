@@ -242,6 +242,9 @@ int Socket::bind(int port) {
     int i = 1;
 
     setsockopt(sck, SOL_SOCKET, SO_REUSEADDR, &i, sizeof(i));
+#ifdef __FreeBSD__
+    setsockopt(sck, SOL_SOCKET, SO_REUSEPORT, &i, sizeof(i));
+#endif
 
     my_adr.sin_port = htons(port);
     my_port = port;
@@ -255,6 +258,9 @@ int Socket::bind(const std::string &ip, int port) {
     int i = 1;
 
     setsockopt(sck, SOL_SOCKET, SO_REUSEADDR, &i, sizeof(i));
+#ifdef __FreeBSD__
+    setsockopt(sck, SOL_SOCKET, SO_REUSEPORT, &i, sizeof(i));
+#endif
 
     my_adr.sin_port = htons(port);
     my_adr.sin_addr.s_addr = inet_addr(ip.c_str());
