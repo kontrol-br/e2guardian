@@ -32,7 +32,7 @@
 #include <netdb.h>
 #include <cstdlib>
 #include <unistd.h>
-#include <sys/time.h>
+#include <time.h>
 #include <strings.h>
 #include <fcntl.h>
 #include <string.h>
@@ -651,8 +651,8 @@ int ConnectionHandler::handlePeer(Socket &peerconn, String &ip, stat_rec *&dysta
 
 int ConnectionHandler::handleConnection(Socket &peerconn, String &ip, bool ismitm, Socket &proxysock,
                                         stat_rec *&dystat) {
-    struct timeval thestart;
-    gettimeofday(&thestart, NULL);
+    struct timespec thestart;
+    clock_gettime(CLOCK_MONOTONIC, &thestart);
 
     //peerconn.setTimeout(o.proxy_timeout);
     peerconn.setTimeout(o.pcon_timeout);
@@ -772,7 +772,7 @@ int ConnectionHandler::handleConnection(Socket &peerconn, String &ip, bool ismit
             if (firsttime) {
                 // reset flags & objects next time round the loop
                 firsttime = false;
-                gettimeofday(&thestart, NULL);
+                clock_gettime(CLOCK_MONOTONIC, &thestart);
                 checkme.thestart = thestart;
 
                 // quick trick for the very first connection :-)
@@ -795,7 +795,7 @@ int ConnectionHandler::handleConnection(Socket &peerconn, String &ip, bool ismit
                 ++dystat->reqs;
 
                 // we will actually need to do *lots* of resetting of flags etc. here for pconns to work
-                gettimeofday(&thestart, NULL);
+                clock_gettime(CLOCK_MONOTONIC, &thestart);
                 checkme.thestart = thestart;
 
                 checkme.bypasstimestamp = 0;
@@ -1502,7 +1502,7 @@ void ConnectionHandler::doLog(std::string &who, std::string &from, NaughtyFilter
     int naughtytype = cm.blocktype;
     bool isexception = cm.isexception;
     bool istext = cm.is_text;
-    struct timeval *thestart = &cm.thestart;
+    struct timespec *thestart = &cm.thestart;
     bool cachehit = false;
     //int code = (cm.wasrequested ? cm.response_header->returnCode() : 200);  //cm.wasrequested is never set anywhere!!
     int code = (cm.response_header->returnCode());
@@ -1624,7 +1624,7 @@ void ConnectionHandler::doLog(std::string &who, std::string &from, NaughtyFilter
         data += String(cachehit) + cr;
         data += String(mimetype) + cr;
         data += String((*thestart).tv_sec) + cr;
-        data += String((*thestart).tv_usec) + cr;
+        data += String((*thestart).tv_nsec) + cr;
         data += l_clienthost + cr;
         if (o.log_user_agent)
             data += (reqheader ? reqheader->userAgent() + cr : cr);
@@ -1665,7 +1665,7 @@ void ConnectionHandler::doRQLog(std::string &who, std::string &from, NaughtyFilt
     int naughtytype = cm.blocktype;
     bool isexception = cm.isexception;
     bool istext = cm.is_text;
-    struct timeval *thestart = &cm.thestart;
+    struct timespec *thestart = &cm.thestart;
     bool cachehit = false;
     int code = 0;
     std::string mimetype = cm.mimetype;
@@ -1733,7 +1733,7 @@ void ConnectionHandler::doRQLog(std::string &who, std::string &from, NaughtyFilt
         data += String(cachehit) + cr;
         data += String(mimetype) + cr;
         data += String((*thestart).tv_sec) + cr;
-        data += String((*thestart).tv_usec) + cr;
+        data += String((*thestart).tv_nsec) + cr;
         data += l_clienthost + cr;
         if (o.log_user_agent)
             data += (reqheader ? reqheader->userAgent() + cr : cr);
@@ -3244,8 +3244,8 @@ void ConnectionHandler::check_content(NaughtyFilter &cm, DataBuffer &docbody, So
 
 #ifdef __SSLMITM
 int ConnectionHandler::handleTHTTPSConnection(Socket &peerconn, String &ip, Socket &proxysock, stat_rec* &dystat) {
-    struct timeval thestart;
-    gettimeofday(&thestart, NULL);
+    struct timespec thestart;
+    clock_gettime(CLOCK_MONOTONIC, &thestart);
 
     peerconn.setTimeout(o.pcon_timeout);
 
@@ -3386,7 +3386,7 @@ std::cerr << thread_id << " -got peer connection - clientip is " << clientip << 
             // do all of this normalisation etc just the once at the start.
             checkme.url = "https://" + checkme.url;
             checkme.setURL(checkme.url);
-            gettimeofday(&checkme.thestart, NULL);
+            clock_gettime(CLOCK_MONOTONIC, &checkme.thestart);
 
 
             // Look up reverse DNS name of client if needed
@@ -3638,8 +3638,8 @@ int ConnectionHandler::handleICAPConnection(Socket &peerconn, String &ip, Socket
     int pcount = 0;
     bool ismitm = false;
 
-    struct timeval thestart;
-    gettimeofday(&thestart, NULL);
+    struct timespec thestart;
+    clock_gettime(CLOCK_MONOTONIC, &thestart);
 
     peerconn.setTimeout(o.pcon_timeout);
 
@@ -3684,7 +3684,7 @@ int ConnectionHandler::handleICAPConnection(Socket &peerconn, String &ip, Socket
             if (firsttime) {
                 // reset flags & objects next time round the loop
                 firsttime = false;
-                gettimeofday(&thestart, NULL);
+                clock_gettime(CLOCK_MONOTONIC, &thestart);
                 checkme.thestart = thestart;
             }
 
@@ -3739,7 +3739,7 @@ int ConnectionHandler::handleICAPConnection(Socket &peerconn, String &ip, Socket
                 ip = icaphead.clientip;
 
                 // we will actually need to do *lots* of resetting of flags etc. here for pconns to work
-                gettimeofday(&thestart, NULL);
+                clock_gettime(CLOCK_MONOTONIC, &thestart);
                 checkme.thestart = thestart;
 
                 //authed = false;

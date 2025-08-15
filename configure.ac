@@ -93,7 +93,7 @@ AC_TYPE_UID_T
 
 # Checks for library functions.
 AC_FUNC_FORK
-AC_CHECK_FUNCS([dup2 gettimeofday memset select])
+AC_CHECK_FUNCS([dup2 clock_gettime memset select])
 AC_CHECK_FUNCS([strerror strstr strtol])
 AC_CHECK_FUNCS([setuid setgid umask seteuid setreuid setlocale])
 AC_SEARCH_LIBS([floor], [m])
