@@ -32,6 +32,8 @@
 #include <memory>
 #include <vector>
 #include <atomic>
+#include <thread>
+#include <chrono>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/select.h>
@@ -1307,13 +1309,45 @@ void accept_connections(int index) // thread to listen on a single listening soc
         thread_id += std::to_string(ct_type);
         thread_id += ": ";
         while ((errorcount < 30) && !ttg) {
-            Socket *peersock = serversockets[index]->accept();
-            int err = serversockets[index]->getErrno();
-            if (err == 0 && peersock != NULL && peersock->getFD() > -1) {
-            	if (ttg) {
-			delete peersock;
-			break;
-		}
+            struct sockaddr_in peer_adr;
+            socklen_t peer_adr_length = sizeof(peer_adr);
+            errno = 0;
+#ifdef HAVE_ACCEPT4
+            int newfd = ::accept4(serversockets[index]->getFD(),
+                (struct sockaddr *) &peer_adr, &peer_adr_length,
+                SOCK_CLOEXEC | SOCK_NONBLOCK);
+            int err = errno;
+#else
+            int newfd = ::accept(serversockets[index]->getFD(),
+                (struct sockaddr *) &peer_adr, &peer_adr_length);
+            int err = errno;
+            if (newfd >= 0) {
+                int flags;
+                if ((flags = fcntl(newfd, F_GETFD)) == -1 ||
+                    fcntl(newfd, F_SETFD, flags | FD_CLOEXEC) == -1 ||
+                    (flags = fcntl(newfd, F_GETFL)) == -1 ||
+                    fcntl(newfd, F_SETFL, flags | O_NONBLOCK) == -1) {
+                    err = errno;
+                    syslog(LOG_ERR, "%sFailed to set flags on accepted socket: %s", thread_id.c_str(), strerror(err));
+                    ::close(newfd);
+                    newfd = -1;
+                }
+            }
+#endif
+            if (newfd >= 0) {
+                struct sockaddr_in my_adr;
+                socklen_t my_len = sizeof(my_adr);
+                if (getsockname(newfd, (struct sockaddr *) &my_adr, &my_len) < 0) {
+                    syslog(LOG_ERR, "%sgetsockname failed: %s", thread_id.c_str(), strerror(errno));
+                    ::close(newfd);
+                    continue;
+                }
+                Socket *peersock = new Socket(newfd, my_adr, peer_adr);
+                peersock->setPort(ntohs(my_adr.sin_port));
+                if (ttg) {
+                    delete peersock;
+                    break;
+                }
 #ifdef DGDEBUG
                 std::cerr << thread_id << "got connection from accept" << std::endl;
 #endif
@@ -1328,15 +1362,17 @@ void accept_connections(int index) // thread to listen on a single listening soc
 #endif
             } else {
                 if (ttg) {
-                        if (peersock != nullptr) delete peersock;
-                        break;
+                    break;
                 }
 #ifdef DGDEBUG
                 std::cerr << thread_id << "Error on accept: errorcount " << errorcount << " errno: " << err << std::endl;
 #endif
-                if (err == ECONNABORTED || err == EAGAIN || err == EINTR) {
+                if (err == ECONNABORTED || err == EINTR) {
                     syslog(LOG_DEBUG, "%sAccept failed: %s", thread_id.c_str(), strerror(err));
-                    if (peersock != nullptr) delete peersock;
+                    continue;
+                } else if (err == EAGAIN || err == EWOULDBLOCK) {
+                    syslog(LOG_DEBUG, "%sAccept would block: %s", thread_id.c_str(), strerror(err));
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
                     continue;
                 }
                 syslog(LOG_ERR, "%sError %d (%s) on accept: errorcount %d", thread_id.c_str(), err, strerror(err), errorcount);
