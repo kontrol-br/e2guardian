@@ -47,6 +47,9 @@ extern thread_local std::string thread_id;
 //
 // destructor
 Socket::~Socket() {
+    if (sck > -1) {
+        syslog(LOG_DEBUG, "%sSocket destructor closing fd %d", thread_id.c_str(), sck);
+    }
     close();
 }
 

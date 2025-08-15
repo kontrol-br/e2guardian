@@ -82,10 +82,9 @@ BaseSocket::BaseSocket(int fd)
 // destructor - close socket
 BaseSocket::~BaseSocket()
 {
-    // close fd if socket not used
-    if (sck > -1) {
-        ::close(sck);
-    }
+    // ensure the socket is closed using the common close handler so we
+    // get consistent logging behaviour.
+    close();
 }
 
 // reset - close socket & reset timeout.
@@ -146,7 +145,12 @@ int BaseSocket::getFD()
 void BaseSocket::close()
 {
     if (sck > -1) {
-        ::close(sck);
+        int fd = sck;
+        syslog(LOG_DEBUG, "%sClosing fd %d", thread_id.c_str(), fd);
+        if (::close(fd) < 0) {
+            int err = errno;
+            syslog(LOG_ERR, "%sFailed to close fd %d: %s", thread_id.c_str(), fd, strerror(err));
+        }
         sck = -1;
         infds[0].fd = -1;
         outfds[0].fd = -1;
