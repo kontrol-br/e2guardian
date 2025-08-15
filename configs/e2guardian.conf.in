@@ -176,11 +176,17 @@ mapportstoips = off
 transparenthttpsport = 8443
 
 #port for ICAP
-#if defined enables icap mode 
-#icapport = 1344  
+#if defined enables icap mode
+#icapport = 1344
+
+# Use FreeBSD's httpready accept filter on listening sockets.
+# Requires the accf_http kernel module.  Disable if the module is
+# unavailable.
+# on | off
+usehttpreadyacceptfilter = off
 
 # the ip of upstream proxy - optional - if blank e2g will go direct to sites.
-# default is "" i.e. no proxy 
+# default is "" i.e. no proxy
 #proxyip = 127.0.0.1
 
 # the port e2guardian connects to proxy on
