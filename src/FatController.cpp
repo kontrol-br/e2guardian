@@ -20,6 +20,7 @@
 #include <fstream>
 #include <sys/time.h>
 #include <sys/poll.h>
+#include <sys/resource.h>
 
 // LINUX ONLY FEATURE
 //#ifdef HAVE_SYS_EPOLL_H
@@ -1373,6 +1374,14 @@ int fc_controlit()   //
 
     o.lm.garbageCollect();
     thread_id = "master: ";
+    struct rlimit rl;
+    rl.rlim_cur = rl.rlim_max = o.desired_fd_limit;
+    if (setrlimit(RLIMIT_NOFILE, &rl) != 0) {
+        if (!is_daemonised) {
+            std::cerr << thread_id << "Unable to set file descriptor limit" << std::endl;
+        }
+        syslog(LOG_ERR, "%sUnable to set file descriptor limit", thread_id.c_str());
+    }
 
     // allocate & create our server sockets
     if (o.map_ports_to_ips) {
