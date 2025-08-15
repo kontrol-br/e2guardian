@@ -679,7 +679,12 @@ bool BaseSocket::writeToSocket(const char *buff, int len, unsigned int flags, in
         sent = 0;
         s_errno = 0;
         errno = 0;
-        if(!isNoWrite()) sent = send(sck, buff + actuallysent, len - actuallysent, 0);
+#ifdef MSG_NOSIGNAL
+        unsigned int send_flags = flags | MSG_NOSIGNAL;
+#else
+        unsigned int send_flags = flags;
+#endif
+        if(!isNoWrite()) sent = send(sck, buff + actuallysent, len - actuallysent, send_flags);
 
 //        if (sent == 0)
         if (sent  < 1)
