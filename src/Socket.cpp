@@ -281,19 +281,36 @@ Socket *Socket::accept() {
 #ifdef HAVE_ACCEPT4
     int newfd = ::accept4(sck, (struct sockaddr *) &peer_adr, &peer_adr_length,
         SOCK_CLOEXEC | SOCK_NONBLOCK);
+    if (newfd < 0) {
+        int e = errno;
+        syslog(LOG_ERR, "%saccept4 failed: %s", thread_id.c_str(), strerror(e));
+        if (newfd >= 0) {
+            ::close(newfd);
+        }
+        s_errno = e;
+        return NULL;
+    }
 #else
     int newfd = ::accept(sck, (struct sockaddr *) &peer_adr, &peer_adr_length);
-    if (newfd > 0) {
-        int flags;
-        if ((flags = fcntl(newfd, F_GETFD)) == -1 ||
-            fcntl(newfd, F_SETFD, flags | FD_CLOEXEC) == -1 ||
-            (flags = fcntl(newfd, F_GETFL)) == -1 ||
-            fcntl(newfd, F_SETFL, flags | O_NONBLOCK) == -1) {
-            int e = errno;
+    if (newfd < 0) {
+        int e = errno;
+        syslog(LOG_ERR, "%saccept failed: %s", thread_id.c_str(), strerror(e));
+        if (newfd >= 0) {
             ::close(newfd);
-            s_errno = e;
-            return NULL;
         }
+        s_errno = e;
+        return NULL;
+    }
+    int flags;
+    if ((flags = fcntl(newfd, F_GETFD)) == -1 ||
+        fcntl(newfd, F_SETFD, flags | FD_CLOEXEC) == -1 ||
+        (flags = fcntl(newfd, F_GETFL)) == -1 ||
+        fcntl(newfd, F_SETFL, flags | O_NONBLOCK) == -1) {
+        int e = errno;
+        syslog(LOG_ERR, "%sfcntl failed on fd %d: %s", thread_id.c_str(), newfd, strerror(e));
+        ::close(newfd);
+        s_errno = e;
+        return NULL;
     }
 #endif
 
@@ -301,10 +318,14 @@ Socket *Socket::accept() {
         Socket *s = new Socket(newfd, my_adr, peer_adr);
         s->setPort(my_port);
         return s;
-    } else {
-        s_errno = errno;
-        return NULL;
     }
+
+    if (newfd >= 0) {
+        ::close(newfd);
+    }
+    s_errno = errno;
+    syslog(LOG_ERR, "%saccept returned invalid fd %d", thread_id.c_str(), newfd);
+    return NULL;
 }
 
 #ifdef __SSLMITM
