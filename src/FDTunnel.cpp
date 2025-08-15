@@ -21,6 +21,9 @@
 #include <string.h>
 #include <algorithm>
 #include <sys/select.h>
+#ifdef __FreeBSD__
+#include <sys/event.h>
+#endif
 
 #ifdef DGDEBUG
 #include <iostream>
@@ -96,6 +99,23 @@ bool FDTunnel::tunnel(Socket &sockfrom, Socket &sockto, bool twoway, off_t targe
 
     fdfrom = sockfrom.getFD();
     fdto = sockto.getFD();
+#ifdef __FreeBSD__
+    int kq = kqueue();
+    if (kq == -1) {
+        return false;
+    }
+    struct kevent changes[2];
+    int nchanges = 0;
+    EV_SET(&changes[nchanges++], fdfrom, EVFILT_READ, EV_ADD | EV_ENABLE, 0, 0, NULL);
+    bool monitor_to = !(ignore && !twoway);
+    if (monitor_to) {
+        EV_SET(&changes[nchanges++], fdto, EVFILT_READ, EV_ADD | EV_ENABLE, 0, 0, NULL);
+    }
+    if (kevent(kq, changes, nchanges, NULL, 0, NULL) < 0) {
+        close(kq);
+        return false;
+    }
+#else
     fromoutfds[0].fd = fdfrom;
     fromoutfds[0].events = POLLOUT;
     tooutfds[0].fd = fdto;
@@ -109,12 +129,125 @@ bool FDTunnel::tunnel(Socket &sockfrom, Socket &sockto, bool twoway, off_t targe
     }
     else
         twayfds[1].fd = fdto;
+#endif
 
     char buff[32768]; // buffer for the input
     int timeout = 120000;    // should be made setable in conf files
 
     bool done = false; // so we get past the first while
 
+#ifdef __FreeBSD__
+    while (!done && (targetthroughput > -1 ? throughput < targetthroughput : true)) {
+        done = true; // if we don't make a successful read and write this flag will stay true
+#ifdef DGDEBUG
+        std::cout <<thread_id << "Start of tunnel loop: throughput:" << throughput
+            << " target:"  << targetthroughput  << std::endl;
+#endif
+
+#ifdef __SSLMITM
+        bool from_ready = false;
+        bool to_ready = false;
+        if (sockfrom.isSsl()) {
+            from_ready = true;
+        } else
+#else
+        bool from_ready = false;
+        bool to_ready = false;
+#endif
+        {
+            struct kevent events[2];
+            struct timespec ts;
+            ts.tv_sec = timeout / 1000;
+            ts.tv_nsec = (timeout % 1000) * 1000000;
+            int rc = kevent(kq, NULL, 0, events, nchanges, &ts);
+            if (rc < 1) {
+#ifdef DGDEBUG
+                std::cout <<thread_id << "tunnel tw kqueue returned error or timeout::" << rc
+                    << std::endl;
+#endif
+                break;
+            }
+#ifdef DGDEBUG
+            std::cout <<thread_id << "tunnel tw kqueue returned ok:" << rc
+                << std::endl;
+#endif
+            from_ready = false;
+            to_ready = false;
+            for (int i = 0; i < rc; ++i) {
+                if (events[i].ident == (uintptr_t)fdfrom)
+                    from_ready = true;
+                else if (events[i].ident == (uintptr_t)fdto)
+                    to_ready = true;
+            }
+        }
+
+        if (from_ready) {
+            int rc;
+            if (targetthroughput > -1)
+                rc = sockfrom.readFromSocket(buff, (((int)sizeof(buff) < ((targetthroughput - throughput))) ? sizeof(buff) : (int)(targetthroughput - throughput)), 0, 0, false);
+            else
+                rc = sockfrom.readFromSocket(buff, sizeof(buff), 0, 0, false);
+
+            if (rc < 0) {
+                break;
+            } else if (!rc) {
+                done = true;
+            } else {
+#ifdef DGDEBUG
+                std::cout <<thread_id << "tunnel got data from sockfrom: " << rc << " bytes" << std::endl;
+#endif
+                throughput += rc;
+                struct kevent wchange;
+                struct kevent wevent;
+                struct timespec tsw;
+                tsw.tv_sec = timeout / 1000;
+                tsw.tv_nsec = (timeout % 1000) * 1000000;
+                EV_SET(&wchange, fdto, EVFILT_WRITE, EV_ADD | EV_ENABLE, 0, 0, NULL);
+                if (kevent(kq, &wchange, 1, &wevent, 1, &tsw) < 1)
+                    break;
+                if ((wevent.flags & (EV_ERROR | EV_EOF)) || wevent.filter != EVFILT_WRITE)
+                    break;
+                if (!sockto.writeToSocket(buff, rc, 0, 0, false))
+                    break;
+#ifdef DGDEBUG
+                std::cout <<thread_id << "tunnel wrote data out: " << rc << " bytes" << std::endl;
+#endif
+                done = false;
+            }
+        }
+
+        if (to_ready) {
+            if (!twoway) {
+#ifdef DGDEBUG
+                std::cout <<thread_id << "fdto is sending data; closing tunnel. (This must be a persistent connection.)" << std::endl;
+#endif
+                break;
+            }
+            int rc = sockto.readFromSocket(buff, sizeof(buff), 0, 0, false);
+            if (rc < 0) {
+                break;
+            } else if (!rc) {
+                done = true;
+                break;
+            } else {
+                struct kevent wchange;
+                struct kevent wevent;
+                struct timespec tsw;
+                tsw.tv_sec = timeout / 1000;
+                tsw.tv_nsec = (timeout % 1000) * 1000000;
+                EV_SET(&wchange, fdfrom, EVFILT_WRITE, EV_ADD | EV_ENABLE, 0, 0, NULL);
+                if (kevent(kq, &wchange, 1, &wevent, 1, &tsw) < 1)
+                    break;
+                if ((wevent.flags & (EV_ERROR | EV_EOF)) || wevent.filter != EVFILT_WRITE)
+                    break;
+                if (!sockfrom.writeToSocket(buff, rc, 0, 0, false))
+                    break;
+                done = false;
+            }
+        }
+    }
+    close(kq);
+#else
     while (!done && (targetthroughput > -1 ? throughput < targetthroughput : true)) {
         done = true; // if we don't make a sucessful read and write this
         // flag will stay true and so the while() will exit
@@ -230,6 +363,7 @@ bool FDTunnel::tunnel(Socket &sockfrom, Socket &sockto, bool twoway, off_t targe
                 }
             }
         }
+#endif
 #ifdef DGDEBUG
         if ((throughput >= targetthroughput) && (targetthroughput > -1))
             std::cout <<thread_id << "All expected data tunnelled. (expected " << targetthroughput << "; tunnelled " << throughput << ")" << std::endl;

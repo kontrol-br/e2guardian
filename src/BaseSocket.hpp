@@ -17,6 +17,9 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <poll.h>
+#ifdef __FreeBSD__
+#include <sys/event.h>
+#endif
 
 int selectEINTR(int numfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout, bool honour_reloadconfig = false);
 
