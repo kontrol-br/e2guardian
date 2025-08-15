@@ -275,7 +275,24 @@ Socket *Socket::accept() {
     s_errno = 0;
     errno = 0;
 //    int newfd = this->baseAccept((struct sockaddr *)&peer_adr, &peer_adr_length);
+#ifdef HAVE_ACCEPT4
+    int newfd = ::accept4(sck, (struct sockaddr *) &peer_adr, &peer_adr_length,
+        SOCK_CLOEXEC | SOCK_NONBLOCK);
+#else
     int newfd = ::accept(sck, (struct sockaddr *) &peer_adr, &peer_adr_length);
+    if (newfd > 0) {
+        int flags;
+        if ((flags = fcntl(newfd, F_GETFD)) == -1 ||
+            fcntl(newfd, F_SETFD, flags | FD_CLOEXEC) == -1 ||
+            (flags = fcntl(newfd, F_GETFL)) == -1 ||
+            fcntl(newfd, F_SETFL, flags | O_NONBLOCK) == -1) {
+            int e = errno;
+            ::close(newfd);
+            s_errno = e;
+            return NULL;
+        }
+    }
+#endif
 
     if (newfd > 0) {
         Socket *s = new Socket(newfd, my_adr, peer_adr);
