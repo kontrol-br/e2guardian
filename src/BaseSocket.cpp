@@ -21,6 +21,7 @@
 #include <sys/select.h>
 #ifdef __FreeBSD__
 #include <sys/event.h>
+#include <netinet/accept_filter.h>
 #endif
 
 #ifdef NETDEBUG
@@ -28,10 +29,12 @@
 #endif
 
 #include "BaseSocket.hpp"
+#include "OptionContainer.hpp"
 
 // GLOBALS
 extern bool reloadconfig;
 extern thread_local std::string thread_id;
+extern OptionContainer o;
 
 // DEFINITIONS
 
@@ -113,7 +116,18 @@ void BaseSocket::baseReset()
 // mark a socket as a listening server socket
 int BaseSocket::listen(int queue)
 {
-    return ::listen(sck, queue);
+    int ret = ::listen(sck, queue);
+#ifdef __FreeBSD__
+    if (ret == 0 && o.use_httpready_accept_filter) {
+        struct accept_filter_arg af;
+        memset(&af, 0, sizeof(af));
+        strcpy(af.af_name, "httpready");
+        if (setsockopt(sck, SOL_SOCKET, SO_ACCEPTFILTER, &af, sizeof(af)) < 0) {
+            syslog(LOG_ERR, "%sFailed to set accept filter: %s", thread_id.c_str(), strerror(errno));
+        }
+    }
+#endif
+    return ret;
 }
 
 // "template adaptor" for accept - basically, let G++ do the hard work of

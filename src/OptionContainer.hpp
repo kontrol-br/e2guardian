@@ -87,6 +87,7 @@ class OptionContainer
     int icap_port = 0;
     std::string icap_reqmod_url;
     std::string icap_resmod_url;
+    bool use_httpready_accept_filter = false;
     std::string proxy_ip;
     std::deque<String> filter_ip;
     std::deque<String> check_ip;

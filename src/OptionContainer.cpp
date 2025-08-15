@@ -628,6 +628,12 @@ bool OptionContainer::read(std::string& filename, int type)
         if (icap_resmod_url == "")
             icap_resmod_url = "response";
 
+        if (findoptionS("usehttpreadyacceptfilter") == "on") {
+            use_httpready_accept_filter = true;
+        } else {
+            use_httpready_accept_filter = false;
+        }
+
 #ifdef ENABLE_ORIG_IP
         if (findoptionS("originalip") == "on") {
             get_orig_ip = true;

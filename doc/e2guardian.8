@@ -24,6 +24,14 @@ information such as every image on a page.
 
 e2guardian is under continuous development and so it is best to visit the web site for the latest information.
 
+.PP
+On FreeBSD systems e2guardian can optionally use the kernel's
+httpready accept filter to delay handing connections to workers until
+an HTTP request is present. This feature is controlled by the
+\fBusehttpreadyacceptfilter\fR configuration option and requires the
+\fBaccf_http\fR module; disable the option if the module is not
+available.
+
  (1) Technically e2guardian is more of a filtering pass\-through than a true proxy \- but don't let that worry you!
 
  (2) e2guardian should work with any proxy, not just Squid. For example, it is known to work with Oops.
