@@ -280,7 +280,7 @@ Socket *Socket::accept() {
     s_errno = 0;
     errno = 0;
 //    int newfd = this->baseAccept((struct sockaddr *)&peer_adr, &peer_adr_length);
-#ifdef HAVE_ACCEPT4
+#if defined(__FreeBSD__) || defined(HAVE_ACCEPT4)
     int newfd = ::accept4(sck, (struct sockaddr *) &peer_adr, &peer_adr_length,
         SOCK_CLOEXEC | SOCK_NONBLOCK);
     if (newfd < 0) {
@@ -300,17 +300,6 @@ Socket *Socket::accept() {
         if (newfd >= 0) {
             ::close(newfd);
         }
-        s_errno = e;
-        return NULL;
-    }
-    int flags;
-    if ((flags = fcntl(newfd, F_GETFD)) == -1 ||
-        fcntl(newfd, F_SETFD, flags | FD_CLOEXEC) == -1 ||
-        (flags = fcntl(newfd, F_GETFL)) == -1 ||
-        fcntl(newfd, F_SETFL, flags | O_NONBLOCK) == -1) {
-        int e = errno;
-        syslog(LOG_ERR, "%sfcntl failed on fd %d: %s", thread_id.c_str(), newfd, strerror(e));
-        ::close(newfd);
         s_errno = e;
         return NULL;
     }
