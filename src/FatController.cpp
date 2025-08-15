@@ -1326,14 +1326,19 @@ void accept_connections(int index) // thread to listen on a single listening soc
                 std::cerr << thread_id << "pushed connection to http_worker_Q" << std::endl;
 #endif
             } else {
-            	if (ttg) {
-			if (peersock != nullptr) delete peersock;
-			break;
-		}
+                if (ttg) {
+                        if (peersock != nullptr) delete peersock;
+                        break;
+                }
 #ifdef DGDEBUG
                 std::cerr << thread_id << "Error on accept: errorcount " << errorcount << " errno: " << err << std::endl;
 #endif
-                syslog(LOG_ERR, "%sError %d on accept: errorcount %d", thread_id.c_str(), err, errorcount);
+                if (err == ECONNABORTED || err == EAGAIN || err == EINTR) {
+                    syslog(LOG_DEBUG, "%sAccept failed: %s", thread_id.c_str(), strerror(err));
+                    if (peersock != nullptr) delete peersock;
+                    continue;
+                }
+                syslog(LOG_ERR, "%sError %d (%s) on accept: errorcount %d", thread_id.c_str(), err, strerror(err), errorcount);
                 ++errorcount;
                 std::this_thread::sleep_for(std::chrono::milliseconds(50));
             }
