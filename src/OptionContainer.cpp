@@ -198,17 +198,22 @@ bool OptionContainer::read(std::string& filename, int type)
 			e2_front_log = false;
 		}
 
-		if (findoptionS("nologger") == "on") {
-			no_logger = true;
-		} else {
-			no_logger = false;
-		}
+                if (findoptionS("nologger") == "on") {
+                        no_logger = true;
+                } else {
+                        no_logger = false;
+                }
 
-		if (findoptionS("softrestart") == "on") {
-			soft_restart = true;
-		} else {
-			soft_restart = false;
-		}
+                if (findoptionS("softrestart") == "on") {
+                        soft_restart = true;
+                } else {
+                        soft_restart = false;
+                }
+
+                desired_fd_limit = findoptionI("desiredfdlimit");
+                if (desired_fd_limit == 0) {
+                        desired_fd_limit = 65535;
+                }
 
 #ifdef __SSLMITM
         ssl_certificate_path = findoptionS("sslcertificatepath") + "/";

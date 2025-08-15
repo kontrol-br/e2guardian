@@ -163,6 +163,7 @@ class OptionContainer
     bool log_timestamp = false;
     bool log_user_agent = false;
     bool soft_restart = false;
+    unsigned int desired_fd_limit = 65535;
 
 #ifdef __SSLMITM
     std::string ssl_certificate_path;
