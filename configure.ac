@@ -25,13 +25,59 @@ AC_LANG(C++)
 AC_CACHE_SAVE
 
 #########################################################################
-# Get GCC version
+# Detect compiler version information
 #########################################################################
-GCC_VERSION=$(gcc --version | head -1 | awk '{print $NF}')
+GCC_VERSION_LINE=""
+GCC_VERSION=""
+GCC_VERSION_MAJOR=""
+GCC_VERSION_MINOR=""
+GCC_VERSION_PATCH=""
+GCC_VERSION_VALID="no"
+USING_GCC="no"
+COMPILER_FOR_VERSION=""
+COMPILER_VERSION_DISPLAY=""
 
-GCC_VERSION_MAJOR=$(echo $GCC_VERSION |cut -d'.' -f1 2>/dev/null)
-GCC_VERSION_MINOR=$(echo $GCC_VERSION |cut -d'.' -f2 2>/dev/null)
-GCC_VERSION_PATCH=$(echo $GCC_VERSION |cut -d'.' -f3 2>/dev/null)
+if command -v gcc >/dev/null 2>&1; then
+GCC_VERSION_LINE=$(gcc --version | head -1)
+GCC_VERSION=$(echo "$GCC_VERSION_LINE" | awk '{print $NF}')
+GCC_VERSION_MAJOR=$(echo "$GCC_VERSION" |cut -d'.' -f1 2>/dev/null)
+GCC_VERSION_MINOR=$(echo "$GCC_VERSION" |cut -d'.' -f2 2>/dev/null)
+GCC_VERSION_PATCH=$(echo "$GCC_VERSION" |cut -d'.' -f3 2>/dev/null)
+COMPILER_FOR_VERSION="gcc"
+USING_GCC="yes"
+case $GCC_VERSION_MAJOR in
+    ''|*[@<:@!0-9@:>@]*) GCC_VERSION_VALID="no" ;;
+    *) GCC_VERSION_VALID="yes" ;;
+esac
+case $GCC_VERSION_MINOR in
+    ''|*[@<:@!0-9@:>@]*) GCC_VERSION_VALID="no" ;;
+esac
+case $GCC_VERSION_PATCH in
+    ''|*[@<:@!0-9@:>@]*) GCC_VERSION_PATCH=0 ;;
+esac
+else
+if test "x$CXX" != "x" && command -v "$CXX" >/dev/null 2>&1; then
+    COMPILER_FOR_VERSION="$CXX"
+elif command -v c++ >/dev/null 2>&1; then
+    COMPILER_FOR_VERSION="c++"
+fi
+if test "x$COMPILER_FOR_VERSION" != "x"; then
+    GCC_VERSION_LINE=$($COMPILER_FOR_VERSION --version 2>/dev/null | head -1)
+fi
+fi
+if test "x$USING_GCC" = "xyes"; then
+    COMPILER_VERSION_DISPLAY="$GCC_VERSION_LINE"
+    if test "x$COMPILER_VERSION_DISPLAY" = "x"; then
+        COMPILER_VERSION_DISPLAY="$GCC_VERSION"
+    fi
+else
+    if test "x$GCC_VERSION_LINE" != "x"; then
+        COMPILER_VERSION_DISPLAY="$GCC_VERSION_LINE (non-GNU)"
+    fi
+fi
+if test "x$COMPILER_VERSION_DISPLAY" = "x"; then
+    COMPILER_VERSION_DISPLAY="unknown C++ compiler"
+fi
 
 # Checks for header files.
 AC_CHECK_HEADERS([arpa/inet.h fcntl.h limits.h netdb.h netinet/in.h stdlib.h])
@@ -282,23 +328,30 @@ exit -1
 #exit -1
 #])
 
-[if test "$GCC_VERSION_MAJOR" -eq 4; then
-	if test "$GCC_VERSION_MINOR" -ge 9; then
-		if test "$GCC_VERSION_PATCH" -ge 3; then
-                        echo "Version: $GCC_VERSION"
-                        CXXFLAGS="${CXXFLAGS} --std=c++11"
+[if test "x$USING_GCC" = "xyes" -a "x$GCC_VERSION_VALID" = "xyes"; then
+        if test "$GCC_VERSION_MAJOR" -gt 4; then
+                echo "Version: $COMPILER_VERSION_DISPLAY"
+                CXXFLAGS="${CXXFLAGS} --std=c++11"
+        elif test "$GCC_VERSION_MAJOR" -eq 4; then
+                if test "$GCC_VERSION_MINOR" -ge 9; then
+                        if test "$GCC_VERSION_PATCH" -ge 3; then
+                                echo "Version: $COMPILER_VERSION_DISPLAY"
+                                CXXFLAGS="${CXXFLAGS} --std=c++11"
+                        else
+                                echo "Version: $COMPILER_VERSION_DISPLAY"
+                                CXXFLAGS="${CXXFLAGS} --std=c++1y"
+                        fi
+                else
+                        echo "Version: $COMPILER_VERSION_DISPLAY"
+                        CXXFLAGS="${CXXFLAGS} --std=c++1y"
                 fi
+        else
+                echo "Version: $COMPILER_VERSION_DISPLAY"
+                CXXFLAGS="${CXXFLAGS} --std=c++1y"
         fi
-	echo "Version: $GCC_VERSION "
-        CXXFLAGS="${CXXFLAGS} --std=c++1y"
 else
-        if test "$GCC_VERSION_MAJOR" -ge 5; then
-        echo "Version: $GCC_VERSION "
+        echo "Version: $COMPILER_VERSION_DISPLAY"
         CXXFLAGS="${CXXFLAGS} --std=c++11"
-	else
-	echo "Version: $GCC_VERSION "
-        CXXFLAGS="${CXXFLAGS} --std=c++1y"
-	fi
 fi
 ]
 

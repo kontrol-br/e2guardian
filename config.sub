@@ -1,0 +1,7 @@
+#!/bin/sh
+# Minimal stub config.sub generated because automake is unavailable.
+if [ "$#" -gt 0 ]; then
+  echo "$1"
+else
+  echo x86_64-unknown-linux-gnu
+fi

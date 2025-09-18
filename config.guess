@@ -1,0 +1,3 @@
+#!/bin/sh
+# Minimal stub config.guess generated because automake is unavailable.
+echo x86_64-unknown-linux-gnu
