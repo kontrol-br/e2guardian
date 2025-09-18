@@ -20,7 +20,7 @@ build:raspbian:
    - apt-get build-dep -y -a armhf e2guardian 
    - cd /builds/fredbcode/e2guardian && make clean  
    - ./autogen.sh
-   - ./configure --host=arm-linux-gnueabihf --prefix=/usr --enable-clamd=yes --with-proxyuser=e2guardian --with-proxygroup=e2guardian --sysconfdir=/etc --localstatedir=/var --enable-icap=yes --enable-commandline=yes --enable-email=yes --enable-ntlm=yes --enable-pcre=yes --enable-sslmitm=yes 
+   - ./configure --host=arm-linux-gnueabihf --prefix=/usr --enable-clamd=yes --with-proxyuser=e2guardian --with-proxygroup=e2guardian --sysconfdir=/etc --localstatedir=/var --enable-icap=yes --enable-commandline=yes --enable-email=yes --enable-ntlm=yes --enable-pcre=yes --enable-sslmitm=yes 'CPPFLAGS=-DFD_SETSIZE=65535'
    - make ARCH=arm-linux-gnueabihf 
    - file src/e2guardian | grep "ARM, EABI5"
    - find /builds/ -name ".git" -exec rm -r "{}" +
