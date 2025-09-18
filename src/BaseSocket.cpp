@@ -21,6 +21,8 @@
 #include <sys/select.h>
 #ifdef __FreeBSD__
 #include <sys/event.h>
+#endif
+#ifdef HAVE_NETINET_ACCEPT_FILTER_H
 #include <netinet/accept_filter.h>
 #endif
 
@@ -117,7 +119,7 @@ void BaseSocket::baseReset()
 int BaseSocket::listen(int queue)
 {
     int ret = ::listen(sck, queue);
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) && defined(HAVE_NETINET_ACCEPT_FILTER_H)
     if (ret == 0 && o.use_httpready_accept_filter) {
         struct accept_filter_arg af;
         memset(&af, 0, sizeof(af));
@@ -125,6 +127,11 @@ int BaseSocket::listen(int queue)
         if (setsockopt(sck, SOL_SOCKET, SO_ACCEPTFILTER, &af, sizeof(af)) < 0) {
             syslog(LOG_ERR, "%sFailed to set accept filter: %s", thread_id.c_str(), strerror(errno));
         }
+    }
+#elif defined(__FreeBSD__)
+    if (ret == 0 && o.use_httpready_accept_filter) {
+        syslog(LOG_WARNING, "%sHTTP ready accept filter not supported by this build; disabling", thread_id.c_str());
+        o.use_httpready_accept_filter = false;
     }
 #endif
     return ret;
