@@ -628,11 +628,21 @@ bool OptionContainer::read(std::string& filename, int type)
         if (icap_resmod_url == "")
             icap_resmod_url = "response";
 
+#ifdef HAVE_NETINET_ACCEPT_FILTER_H
         if (findoptionS("usehttpreadyacceptfilter") == "on") {
             use_httpready_accept_filter = true;
         } else {
             use_httpready_accept_filter = false;
         }
+#else
+        if (findoptionS("usehttpreadyacceptfilter") == "on") {
+            if (!is_daemonised) {
+                std::cerr << "usehttpreadyacceptfilter requested but not supported; disabling" << std::endl;
+            }
+            syslog(LOG_WARNING, "%s", "usehttpreadyacceptfilter requested but not supported; disabling");
+        }
+        use_httpready_accept_filter = false;
+#endif
 
 #ifdef ENABLE_ORIG_IP
         if (findoptionS("originalip") == "on") {
