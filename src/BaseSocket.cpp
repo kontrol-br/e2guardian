@@ -266,7 +266,7 @@ bool BaseSocket::bcheckSForInput(int timeout)
     ts.tv_sec = timeout / 1000;
     ts.tv_nsec = (timeout % 1000) * 1000000;
     rc = kevent(kq, &change, 1, &event, 1, &ts);
-    close(kq);
+    ::close(kq);
     if (rc == 0) {
         timedout = true;
         return false;
@@ -334,7 +334,7 @@ bool BaseSocket::bcheckForInput(int timeout)
     ts.tv_sec = timeout / 1000;
     ts.tv_nsec = (timeout % 1000) * 1000000;
     rc = kevent(kq, &change, 1, &event, 1, &ts);
-    close(kq);
+    ::close(kq);
     if (rc == 0) {
         timedout = true;
         return false;
@@ -402,7 +402,7 @@ bool BaseSocket::checkForInput()
     ts.tv_sec = 0;
     ts.tv_nsec = 0;
     rc = kevent(kq, &change, 1, &event, 1, &ts);
-    close(kq);
+    ::close(kq);
     if (rc == 0) {
         return false;
     }
@@ -468,7 +468,7 @@ bool BaseSocket::readyForOutput()
     ts.tv_sec = 0;
     ts.tv_nsec = 0;
     rc = kevent(kq, &change, 1, &event, 1, &ts);
-    close(kq);
+    ::close(kq);
     if (rc == 0) {
         return false;
     }
@@ -526,7 +526,7 @@ bool BaseSocket::breadyForOutput(int timeout) {
     ts.tv_sec = timeout / 1000;
     ts.tv_nsec = (timeout % 1000) * 1000000;
     rc = kevent(kq, &change, 1, &event, 1, &ts);
-    close(kq);
+    ::close(kq);
     if (rc == 0) {
         timedout = true;
         return false;
