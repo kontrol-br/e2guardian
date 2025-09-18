@@ -1,8 +1,8 @@
 About "Bug" tags show "https://github.com/e2guardian/e2guardian/issues?q=is%3Aissue+is%3Aclosed" 
 
-version 5.3.5
+version 5.3.8
 
-February 2020 to August 2020
+February 2020 to August 2020 (updates through 5.3.8)
 
 - Fix bug #619 x-forwarded wrong IP in MITM requests
 - Fix #607 - exceptionmimetypes not working
