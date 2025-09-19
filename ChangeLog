@@ -1,8 +1,8 @@
-About "Bug" tags show "https://github.com/e2guardian/e2guardian/issues?q=is%3Aissue+is%3Aclosed" 
+About "Bug" tags show "https://github.com/e2guardian/e2guardian/issues?q=is%3Aissue+is%3Aclosed"
 
-version 5.3.5
+version 5.3.8
 
-February 2020 to August 2020
+February 2020 to September 2025
 
 - Fix bug #619 x-forwarded wrong IP in MITM requests
 - Fix #607 - exceptionmimetypes not working
@@ -19,9 +19,9 @@ version 5.3.4
 January 2020
 
 - Increase example maxcontentcachesize to make filtering youtube work
-- Fix #565 segfault when no write permission on generated certs directory 
+- Fix #565 segfault when no write permission on generated certs directory
 - Fix #493 referexception not working
-- Fix #549 - Url in CGI and bypass wrong in MITM 
+- Fix #549 - Url in CGI and bypass wrong in MITM
 - Bug fix sigwait code for OpenBSD
 - Amend example bannedregexpulrlist
 - Fix #554 Override Search Terms not overriding weighted search term check
@@ -48,18 +48,18 @@ April 2019
 
 - Fix bug #532 - reverse IP lookup give random chars in log and segfaults
 - Update comments in list files - as per issue #530
-- Add support for reading openssl config files - new optional 
+- Add support for reading openssl config files - new optional
   e2guardian.conf params useopensslconf and opensslconffile
 - Fix bug #527 - memory leaking when complied with openssl v1.1
-- Loop detect code added - enhancement #523 - 
-  Note that to activate loop detect 'checkip' lines need to be added to 
-  e2guardian.conf, one for each ip the e2guardian system is listening on, 
+- Loop detect code added - enhancement #523 -
+  Note that to activate loop detect 'checkip' lines need to be added to
+  e2guardian.conf, one for each ip the e2guardian system is listening on,
   including loopback and any VIP used.
 
 March 2019
 
 - Fix #512
-- Fix segfault bug #509 
+- Fix segfault bug #509
 
 Version 5.3.2
 
@@ -78,28 +78,28 @@ January 2019
 - Add stealth mode (reporting without block) to StoryBoard mode
 - Add new secure bypass mode (experimental)
 - Better handling for non-tls and non-sni calls on transparent https
-- Fix bug #490 modified URL not shown in log 
-- Fix bug #489 - exception file ext/mime type not working correctly 
-- Fix bug #486 - bypass cookie not being set in proxy mode 
+- Fix bug #490 modified URL not shown in log
+- Fix bug #489 - exception file ext/mime type not working correctly
+- Fix bug #486 - bypass cookie not being set in proxy mode
 
 December 2018
 
-- Fix for #485 related to #481 wrong upstream site called in direct mode 
-- Fix bug #481 auth exception being denied 
-- Fix bug #480 Ignore http 100 when no expect: 100-continue 
-- Fix bug #478 check searchterms always being called 
+- Fix for #485 related to #481 wrong upstream site called in direct mode
+- Fix bug #481 auth exception being denied
+- Fix bug #480 Ignore http 100 when no expect: 100-continue
+- Fix bug #478 check searchterms always being called
 - Fix bug #476 - only check when potential url is longer than 3 chars and contains'.'
 - Fix bug #464 proxy auth issues
-- Fix bug #475 Client Hostname blank in template 
-- Fix bug #473 ICAP mode: Wrong group in respmod 
-- Fix bug #465 Incorrect wildcard certificate validation 
+- Fix bug #475 Client Hostname blank in template
+- Fix bug #473 ICAP mode: Wrong group in respmod
+- Fix bug #465 Incorrect wildcard certificate validation
 
 and more ...
 
 Version 5.2.2
 
 September 2018
-- Reenable content regexp option 
+- Reenable content regexp option
 - Allow the ip authplugin to use the X-Client-IP header when using ICAP
 - Fix bug #432 Block html page gets shown twice
 - Fix bug #436 compilation bug with avast and kavscan
@@ -116,7 +116,7 @@ August 2018
 July 2018
 - Fix ICAP client - tested with f-secure and Kav4proxy -
 - Fix bug #417 urlredirectregexplist doesn't work
-- Fix bug #418 NTLM auth is not working 
+- Fix bug #418 NTLM auth is not working
 - Fix bug #410 segfault if "neterrtemplate=" doesn't exist in config
 - Fix bug #414 compiler error caused by extra brace
 
