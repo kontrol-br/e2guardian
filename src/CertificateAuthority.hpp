@@ -2,6 +2,8 @@
 #define __HPP_CERTIFICATEAUTHORITY
 #ifdef __SSLMITM
 
+#include <cstddef>
+
 struct ca_serial {
     ASN1_INTEGER *asn;
     char *charhex;
@@ -19,7 +21,7 @@ class CertificateAuthority
     EVP_PKEY *_certPrivKey;
     X509 *_caCert;
     std::string _certPath;
-    int _certPathLen;
+    size_t _certPathLen;
     std::string _certLinks;
     time_t _ca_start;
     time_t _ca_end;

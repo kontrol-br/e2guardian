@@ -110,10 +110,16 @@ CertificateAuthority::CertificateAuthority(const char *caCert,
     fclose(fp);
 
     //TODO should check this is a writable dir
-    _certPath = certPath;
-    _certPathLen = sizeof(certPath);
+    size_t certPathLen = 0;
+    if (certPath != nullptr) {
+        _certPath = certPath;
+        certPathLen = strlen(certPath);
+    } else {
+        _certPath.clear();
+    }
+    _certPathLen = certPathLen;
     //	_certLinks = certLinks;
-    _certLinks = certPath; // temp to check if this works
+    _certLinks = _certPath; // temp to check if this works
     //_ca_start = 1417872951;  // 6th Dec 2014
     //_ca_end = _ca_start + 315532800;  // 6th Dec 2024
     _ca_start = caStart;
@@ -509,7 +515,16 @@ int CertificateAuthority::mkpath(const char *path, mode_t mode)
     char *copypath = strdup(path);
 
     status = 0;
-    pp = copypath + _certPathLen; //start checking within generated cert directory
+    size_t copylen = strlen(copypath);
+    size_t offset = 0;
+    if (_certPathLen > 0 && _certPathLen <= copylen &&
+        strncmp(copypath, _certPath.c_str(), _certPathLen) == 0) {
+        offset = _certPathLen;
+    }
+    pp = copypath + offset; // start checking within generated cert directory
+    while (*pp == '/' && *pp != '\0') {
+        ++pp;
+    }
     while (status == 0 && (sp = strchr(pp, '/')) != 0) {
         if (sp != pp) {
             *sp = '\0';
