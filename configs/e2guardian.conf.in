@@ -668,13 +668,12 @@ generatedcertpath = '@DGCONFDIR@/private/generatedcerts/'
 #         store and also may get problems on running client browsers
 
 #Generated cert start time (in unix time) - optional
-# defaults to 1417872951 = 6th Dec 2014
-# generatedcertstart = 1417872951 
+# defaults to the current system time when certificates are generated
+# generatedcertstart = 1417872951
 
 #Generated cert end time (in unix time) - optional
 # defaults to generatedcertstart + 10 years
 #genratedcertend =
-# generatedcertstart =
 
 #Use openssl configuration file
 # switch this on if you want e2g to read in openssl configuration

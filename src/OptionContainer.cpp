@@ -18,6 +18,7 @@
 #include <syslog.h>
 #include <dirent.h>
 #include <cstdlib>
+#include <ctime>
 #include <unistd.h> // checkme: remove?
 
 // GLOBALS
@@ -280,11 +281,17 @@ bool OptionContainer::read(std::string& filename, int type)
         }
 
         time_t gen_cert_start, gen_cert_end;
-        time_t def_start = 1728164194; // Thu Oct 05 2024 21:36:34
-        time_t ten_years = 315532800;  // Thu Oct 05 2034 21:36:34
-        gen_cert_start = findoptionI("generatedcertstart");
-        if (gen_cert_start < def_start)
-            gen_cert_start = def_start;
+        time_t ten_years = 315532800;  // 10 years in seconds
+        std::string gen_cert_start_option = findoptionS("generatedcertstart");
+        if (!gen_cert_start_option.empty()) {
+            gen_cert_start = findoptionI("generatedcertstart");
+        } else {
+            time_t now = time(nullptr);
+            if (now < 0) {
+                now = 0;
+            }
+            gen_cert_start = now;
+        }
         gen_cert_end = findoptionI("generatedcertend");
         if (gen_cert_end < gen_cert_start)
             gen_cert_end = gen_cert_start + ten_years;
