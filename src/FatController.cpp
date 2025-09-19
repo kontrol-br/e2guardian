@@ -1309,10 +1309,10 @@ void accept_connections(int index) // thread to listen on a single listening soc
             Socket *peersock = serversockets[index]->accept();
             int err = serversockets[index]->getErrno();
             if (err == 0 && peersock != NULL && peersock->getFD() > -1) {
-            	if (ttg) {
-			delete peersock;
-			break;
-		}
+                if (ttg) {
+                        delete peersock;
+                        break;
+                }
 #ifdef DGDEBUG
                 std::cerr << thread_id << "got connection from accept" << std::endl;
 #endif
@@ -1326,12 +1326,26 @@ void accept_connections(int index) // thread to listen on a single listening soc
                 std::cerr << thread_id << "pushed connection to http_worker_Q" << std::endl;
 #endif
             } else {
-            	if (ttg) {
-			if (peersock != nullptr) delete peersock;
-			break;
-		}
+                if (ttg) {
+                        if (peersock != nullptr) delete peersock;
+                        break;
+                }
 #ifdef DGDEBUG
                 std::cerr << thread_id << "Error on accept: errorcount " << errorcount << " errno: " << err << std::endl;
+#endif
+                if (peersock != nullptr) {
+                    delete peersock;
+                    peersock = nullptr;
+                }
+                if (err == EINTR || err == ECONNABORTED || err == ECONNRESET || err == EAGAIN) {
+#ifdef DGDEBUG
+                    std::cerr << thread_id << "Transient accept error " << err << " - continuing" << std::endl;
+#endif
+                    syslog(LOG_DEBUG, "%sTransient error %d on accept", thread_id.c_str(), err);
+                    continue;
+                }
+#ifdef DGDEBUG
+                std::cerr << thread_id << "Error on accept: incrementing errorcount" << std::endl;
 #endif
                 syslog(LOG_ERR, "%sError %d on accept: errorcount %d", thread_id.c_str(), err, errorcount);
                 ++errorcount;
