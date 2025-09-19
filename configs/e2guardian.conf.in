@@ -662,12 +662,16 @@ generatedcertpath = '@DGCONFDIR@/private/generatedcerts/'
 #         store and also may get problems on running client browsers
 
 #Generated cert start time (in unix time) - optional
-# defaults to 1417872951 = 6th Dec 2014
-# generatedcertstart = 1417872951 
+# defaults to 1728164194 = 5th Oct 2024 21:36:34 UTC
+# Set generatedcertstart/generatedcertend to redefine the validity window; the
+# code will enforce at least this start time and a minimum 10 year duration.
+# generatedcertstart = 1728164194
 
 #Generated cert end time (in unix time) - optional
-# defaults to generatedcertstart + 10 years
-#genratedcertend =
+# defaults to generatedcertstart + 10 years.  If a value earlier than this
+# minimum is set, e2guardian will extend it to maintain at least 10 years of
+# validity.
+# generatedcertend =
 # generatedcertstart =
 
 #Use openssl configuration file
