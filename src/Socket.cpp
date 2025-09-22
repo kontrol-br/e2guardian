@@ -492,11 +492,7 @@ void Socket::cleanSsl() {  // called when failure in ssl set up functions and fr
 long Socket::checkCertValid(String &hostname)
 {
     //check we have a certificate
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-    X509 *peerCert = SSL_get1_peer_certificate(ssl);
-#else
     X509 *peerCert = SSL_get_peer_certificate(ssl);
-#endif
     if (peerCert == NULL) {
         return -1;
     }
@@ -517,13 +513,10 @@ X509_VERIFY_PARAM_free(param);
 //check the common name and altnames of a certificate against hostname
 int Socket::checkCertHostname(const std::string &_hostname)
 {
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
     String hostname = _hostname;
 
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
-    X509 *peercertificate = SSL_get1_peer_certificate(ssl);
-#else
     X509 *peercertificate = SSL_get_peer_certificate(ssl);
-#endif
     if (peercertificate == NULL) {
 #ifdef NETDEBUG
         std::cout << thread_id << "unable to get certificate for " << hostname << std::endl;
@@ -672,7 +665,9 @@ int Socket::checkCertHostname(const std::string &_hostname)
         X509_free(peercertificate);
         return 0;
     }
-    X509_free(peercertificate);
+#else  // is openssl v1.1 or above
+    return 0;    //TODO
+#endif
     return -1;
 }
 
