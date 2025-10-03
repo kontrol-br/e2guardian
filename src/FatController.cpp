@@ -31,6 +31,7 @@
 #include <memory>
 #include <vector>
 #include <atomic>
+#include <cstddef>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/select.h>
@@ -1720,9 +1721,17 @@ int fc_controlit()   //
             std::cerr << thread_id << "gentle reload activated" << std::endl;
 #endif
             syslog(LOG_INFO, "%sReconfiguring E2guardian: gentle reload starting", thread_id.c_str());
-            if (o.createLists(++reload_cnt))
-                syslog(LOG_INFO, "%sReconfiguring E2guardian: gentle reload completed", thread_id.c_str());
-            else
+            if (o.createLists(++reload_cnt)) {
+                // Garbage collection must follow every reload so unused lists do not accumulate indefinitely.
+                std::size_t reclaimed = o.lm.garbageCollect();
+                if (reclaimed > 0) {
+                    syslog(LOG_INFO,
+                           "%sReconfiguring E2guardian: gentle reload completed; reclaimed %zu unused lists",
+                           thread_id.c_str(), reclaimed);
+                } else {
+                    syslog(LOG_INFO, "%sReconfiguring E2guardian: gentle reload completed", thread_id.c_str());
+                }
+            } else
                 syslog(LOG_INFO, "%sReconfiguring E2guardian: gentle reload failed", thread_id.c_str());
 
             gentlereload = false;
