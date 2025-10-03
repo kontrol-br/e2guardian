@@ -57,8 +57,9 @@ int ListManager::findNULL()
 }
 
 // delete all lists with zero reference count
-void ListManager::garbageCollect()
+std::size_t ListManager::garbageCollect()
 {
+    std::size_t reclaimed = 0;
     for (unsigned int i = 0; i < l.size(); i++) {
         if (l[i] != NULL) {
             if ((*l[i]).refcount < 1) {
@@ -67,9 +68,11 @@ void ListManager::garbageCollect()
 #endif
                 delete l[i];
                 l[i] = NULL;
+                ++reclaimed;
             }
         }
     }
+    return reclaimed;
 }
 
 void ListManager::deRefList(size_t i)
