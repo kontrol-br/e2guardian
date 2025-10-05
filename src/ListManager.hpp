@@ -12,6 +12,7 @@
 #include "String.hpp"
 #include "ListContainer.hpp"
 
+#include <cstddef>
 #include <deque>
 
 // DECLARATION
@@ -41,7 +42,7 @@ class ListManager
     void deRefList(size_t item);
 
     // delete lists with refcount zero
-    void garbageCollect();
+    std::size_t garbageCollect();
 
     private:
     // find an empty slot in our collection of listcontainters
