@@ -224,8 +224,8 @@ int ipinstance::determineGroup(std::string &user, int &rfg, ListContainer &uglc)
 // search for IP in list & return filter group on success, -1 on failure
 int ipinstance::inList(const uint32_t &ip)
 {
-    if (iplist.size() > 0) {
-        return searchList(0, iplist.size(), ip);
+    if (!iplist.empty()) {
+        return searchList(0, static_cast<int>(iplist.size()) - 1, ip);
     }
     return -1;
 }
@@ -235,6 +235,7 @@ int ipinstance::searchList(int a, int s, const uint32_t &ip)
 {
     if (a > s)
         return -1;
+
     int m = (a + s) / 2;
     if (iplist[m] == ip)
         return iplist[m].group;
