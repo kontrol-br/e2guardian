@@ -493,9 +493,9 @@ long Socket::checkCertValid(String &hostname)
 {
     //check we have a certificate
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
-    X509 *peerCert = SSL_get1_peer_certificate(ssl);
-#else
     X509 *peerCert = SSL_get_peer_certificate(ssl);
+#else
+    X509 *peerCert = SSL_get1_peer_certificate(ssl);
 #endif
     if (peerCert == NULL) {
         return -1;
@@ -520,9 +520,9 @@ int Socket::checkCertHostname(const std::string &_hostname)
     String hostname = _hostname;
 
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
-    X509 *peercertificate = SSL_get1_peer_certificate(ssl);
-#else
     X509 *peercertificate = SSL_get_peer_certificate(ssl);
+#else
+    X509 *peercertificate = SSL_get1_peer_certificate(ssl);
 #endif
     if (peercertificate == NULL) {
 #ifdef NETDEBUG
