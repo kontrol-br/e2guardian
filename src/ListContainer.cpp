@@ -23,6 +23,72 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <list>
+#include <string>
+#include <cerrno>
+#include <cstring>
+
+namespace {
+
+bool ensureAuthexceptionListExists(const char *filename)
+{
+    static const char *kSuffixes[] = {
+        "authexceptioniplist",
+        "authexceptionsitelist",
+        "authexceptionurllist"
+    };
+
+    std::string path(filename);
+    for (const char *suffix : kSuffixes) {
+        size_t suffix_len = strlen(suffix);
+        if (path.length() >= suffix_len &&
+            path.compare(path.length() - suffix_len, suffix_len, suffix) == 0) {
+            struct stat status;
+            if (stat(filename, &status) == 0) {
+                return true;
+            }
+
+            if (errno != ENOENT) {
+                if (!is_daemonised) {
+                    std::cerr << thread_id << "Unable to access list " << filename
+                              << ": " << strerror(errno) << std::endl;
+                }
+                syslog(LOG_ERR, "Unable to access list %s: %s", filename, strerror(errno));
+                return false;
+            }
+
+            std::ofstream newlist(filename, std::ios::out | std::ios::trunc);
+            if (!newlist.good()) {
+                if (!is_daemonised) {
+                    std::cerr << thread_id << "Unable to create missing list " << filename
+                              << ": " << strerror(errno) << std::endl;
+                }
+                syslog(LOG_ERR, "Unable to create missing list %s: %s", filename, strerror(errno));
+                return false;
+            }
+
+            if (strcmp(suffix, "authexceptioniplist") == 0) {
+                newlist << "#Client IPs allowed prior to authentication" << std::endl;
+            } else {
+                newlist << "#Access allowed prior to authentication" << std::endl;
+            }
+            newlist.close();
+
+            if (chmod(filename, S_IRUSR | S_IWUSR | S_IRGRP) != 0) {
+                syslog(LOG_WARNING, "Unable to set permissions on %s: %s", filename, strerror(errno));
+            }
+
+            if (!is_daemonised) {
+                std::cerr << thread_id << "Created missing authexception list " << filename << std::endl;
+            }
+            syslog(LOG_INFO, "Created missing authexception list %s", filename);
+            return true;
+        }
+    }
+
+    return true;
+}
+
+} // namespace
 
 // GLOBALS
 
@@ -519,6 +585,9 @@ bool ListContainer::readItemList(const char *filename, bool startswith, int filt
     std::cerr << thread_id << filename << std::endl;
 #endif
     //struct stat s;
+    if (!ensureAuthexceptionListExists(filename)) {
+        return false;
+    }
     filedate = getFileDate(filename);
     size_t len = 0;
     try {
