@@ -30,6 +30,7 @@
 extern bool is_daemonised;
 extern thread_local std::string thread_id;
 
+
 namespace {
 
 bool ensureAuthexceptionListExists(const char *filename)
