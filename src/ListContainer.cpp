@@ -27,6 +27,10 @@
 #include <cerrno>
 #include <cstring>
 
+extern bool is_daemonised;
+extern thread_local std::string thread_id;
+
+
 namespace {
 
 bool ensureAuthexceptionListExists(const char *filename)
@@ -92,9 +96,7 @@ bool ensureAuthexceptionListExists(const char *filename)
 
 // GLOBALS
 
-extern bool is_daemonised;
 extern OptionContainer o;
-extern thread_local std::string thread_id;
 
 // DEFINES
 
