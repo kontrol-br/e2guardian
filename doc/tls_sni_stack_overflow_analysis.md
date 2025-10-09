@@ -19,6 +19,7 @@ Além disso, vários cálculos de comprimento assumiam implicitamente que haveri
 As alterações introduzidas:
 
 1. **Validação estrita de limites** – cada passo da navegação dentro do *ClientHello* verifica se há bytes suficientes antes de ler ou avançar ponteiros. Caso contrário, a função retorna `NULL` sem tocar o *buffer*. Quando o pacote capturado é menor do que o tamanho total das extensões informado no ClientHello, o laço limita a busca ao que foi efetivamente recebido, evitando falsos negativos ao mesmo tempo em que impede leitura fora dos limites.
+
 2. **Cópia para `thread_local std::string`** – em vez de escrever `\0` dentro do *buffer* espiado, o nome SNI é copiado para uma `std::string` específica da *thread*. O ponteiro retornado aponta para o conteúdo seguro dessa string, evitando qualquer escrita fora dos limites do *ClientHello* original.
 
 Essa combinação elimina a gravação fora da pilha e garante que entradas malformadas não causem estouro de pilha, estabilizando o modo transparente com interceptação SSL.

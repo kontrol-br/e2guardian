@@ -3625,7 +3625,6 @@ char *get_TLS_SNI(char *inbytes, int *len)
 
     if (maxchar > ebytes)
         maxchar = ebytes;
-
     unsigned short ext_type = 1;
     unsigned short ext_len;
     while (curr < maxchar && ext_type != 0)
