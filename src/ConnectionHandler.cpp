@@ -42,6 +42,7 @@
 #include <istream>
 #include <sstream>
 #include <memory>
+#include <string>
 
 #ifdef ENABLE_ORIG_IP
 #include <linux/types.h>
@@ -3585,49 +3586,81 @@ std::cerr << thread_id << " -got peer connection - clientip is " << clientip << 
 }
 
 
-char *get_TLS_SNI(char *inbytes, int* len)
+char *get_TLS_SNI(char *inbytes, int *len)
 {
-    unsigned char *bytes = reinterpret_cast<unsigned char*>(inbytes);
-    unsigned char *curr;
-    unsigned char *ebytes;
-     ebytes = bytes + *len;
-    if (*len < 44) return NULL;
+    unsigned char *bytes = reinterpret_cast<unsigned char *>(inbytes);
+    unsigned char *ebytes = bytes + *len;
+
+    if (*len < 44)
+        return NULL;
+
     unsigned char sidlen = bytes[43];
-    curr = bytes + 1 + 43 + sidlen;
-    if (curr > ebytes) return NULL;
-    unsigned short cslen = ntohs(*(unsigned short*)curr);
-    curr += 2 + cslen;
-    if (curr > ebytes) return NULL;
-    unsigned char cmplen = *curr;
-    curr += 1 + cmplen;
-    if (curr > ebytes) return NULL;
-    unsigned char *maxchar = curr + 2 + ntohs(*(unsigned short*)curr);
+    unsigned char *curr = bytes + 44 + sidlen;
+    if (curr > ebytes)
+        return NULL;
+
+    if (ebytes - curr < 2)
+        return NULL;
+    unsigned short cslen = ntohs(*(unsigned short *)curr);
     curr += 2;
+
+    if (ebytes - curr < cslen)
+        return NULL;
+    curr += cslen;
+
+    if (ebytes - curr < 1)
+        return NULL;
+    unsigned char cmplen = *curr;
+    curr += 1;
+
+    if (ebytes - curr < cmplen)
+        return NULL;
+    curr += cmplen;
+
+    if (ebytes - curr < 2)
+        return NULL;
+    unsigned short total_ext_len = ntohs(*(unsigned short *)curr);
+    unsigned char *maxchar = curr + 2 + total_ext_len;
+    curr += 2;
+
+    if (maxchar > ebytes)
+        maxchar = ebytes;
+
     unsigned short ext_type = 1;
     unsigned short ext_len;
-    while(curr < maxchar && ext_type != 0)
+    while (curr < maxchar && ext_type != 0)
     {
-        if (curr > ebytes) return NULL;
-        ext_type = ntohs(*(unsigned short*)curr);
+        if (ebytes - curr < 4)
+            return NULL;
+        ext_type = ntohs(*(unsigned short *)curr);
         curr += 2;
-        if (curr > ebytes) return NULL;
-        ext_len = ntohs(*(unsigned short*)curr);
+        ext_len = ntohs(*(unsigned short *)curr);
         curr += 2;
-        if(ext_type == 0)
+
+        if (ext_type == 0)
         {
-            curr += 3;
-            if (curr > ebytes) return NULL;
-            unsigned short namelen = ntohs(*(unsigned short*)curr);
+            if (ebytes - curr < 3)
+                return NULL;
+            curr += 1; // name type
+            unsigned short namelen = ntohs(*(unsigned short *)curr);
             curr += 2;
-            if ((curr + namelen) > ebytes) return NULL;
-            //*len = namelen;
-            *(curr +namelen) = (char)0;
-            return (char*)curr;
+
+            if (ebytes - curr < namelen)
+                return NULL;
+
+            static thread_local std::string sni_host;
+            sni_host.assign(reinterpret_cast<const char *>(curr), namelen);
+            // Preserve the historical behaviour where the caller's length is the
+            // size of the ClientHello peek.  Only hand back the hostname.
+            return const_cast<char *>(sni_host.c_str());
         }
-        else curr += ext_len;
+
+        if (ebytes - curr < ext_len)
+            return NULL;
+        curr += ext_len;
     }
-    //if (curr != maxchar) throw std::exception("incomplete SSL Client Hello");
-    return NULL; //SNI was not present
+
+    return NULL; // SNI was not present
 }
 
 #endif
