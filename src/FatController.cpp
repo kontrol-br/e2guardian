@@ -138,6 +138,7 @@ void stat_rec::clear()
 {
     conx = 0;
     reqs = 0;
+    maxusedfd = 0;
 };
 
 void stat_rec::start()
@@ -169,14 +170,16 @@ void stat_rec::start()
 void stat_rec::reset()
 {
     time_t now = time(NULL);
-    int bc = busychildren;
+    int bc = busychildren.load();
     long period = now - start_int;
-    long cnx = (long)conx;
-    long rqx = (long) reqs;
-    int mfd = maxusedfd;
+    long cnx = conx.exchange(0);
+    long rqx = reqs.exchange(0);
+    int mfd = maxusedfd.exchange(0);
     int LC = o.LC_cnt;
+    if (period <= 0) {
+        period = 1;
+    }
     // clear and reset stats now so that stats are less likely to be missed
-    clear();
     if ((end_int + o.dstat_interval) > now)
         start_int = end_int;
     else
@@ -1317,7 +1320,11 @@ void accept_connections(int index) // thread to listen on a single listening soc
 #ifdef DGDEBUG
                 std::cerr << thread_id << "got connection from accept" << std::endl;
 #endif
-                if (peersock->getFD() > dstat.maxusedfd) dstat.maxusedfd = peersock->getFD();
+                int fd = peersock->getFD();
+                int observed = dstat.maxusedfd.load();
+                while (fd > observed && !dstat.maxusedfd.compare_exchange_weak(observed, fd)) {
+                    // observed updated with the latest value from maxusedfd
+                }
                 errorcount = 0;
                 LQ_rec rec;
                 rec.sock = peersock;
