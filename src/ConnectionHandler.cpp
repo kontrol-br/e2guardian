@@ -42,6 +42,7 @@
 #include <istream>
 #include <sstream>
 #include <memory>
+#include <string>
 
 #ifdef ENABLE_ORIG_IP
 #include <linux/types.h>
@@ -3587,10 +3588,12 @@ std::cerr << thread_id << " -got peer connection - clientip is " << clientip << 
 
 char *get_TLS_SNI(char *inbytes, int* len)
 {
+    static thread_local std::string sni_buffer;
+
     unsigned char *bytes = reinterpret_cast<unsigned char*>(inbytes);
     unsigned char *curr;
     unsigned char *ebytes;
-     ebytes = bytes + *len;
+    ebytes = bytes + *len;
     if (*len < 44) return NULL;
     unsigned char sidlen = bytes[43];
     curr = bytes + 1 + 43 + sidlen;
@@ -3620,9 +3623,8 @@ char *get_TLS_SNI(char *inbytes, int* len)
             unsigned short namelen = ntohs(*(unsigned short*)curr);
             curr += 2;
             if ((curr + namelen) > ebytes) return NULL;
-            //*len = namelen;
-            *(curr +namelen) = (char)0;
-            return (char*)curr;
+            sni_buffer.assign(reinterpret_cast<char*>(curr), namelen);
+            return const_cast<char*>(sni_buffer.c_str());
         }
         else curr += ext_len;
     }
