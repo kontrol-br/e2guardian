@@ -495,6 +495,34 @@ bool daemonise()
 // *
 
 // handle any connections received by this thread
+namespace {
+class BusyChildGuard {
+public:
+    explicit BusyChildGuard(stat_rec *stats) : stats_(stats) {
+        if (stats_) {
+            ++stats_->busychildren;
+        }
+    }
+
+    BusyChildGuard(const BusyChildGuard &) = delete;
+    BusyChildGuard &operator=(const BusyChildGuard &) = delete;
+
+    ~BusyChildGuard() {
+        release();
+    }
+
+    void release() {
+        if (stats_) {
+            --stats_->busychildren;
+            stats_ = nullptr;
+        }
+    }
+
+private:
+    stat_rec *stats_;
+};
+} // namespace
+
 void handle_connections(int tindex)
 {
     thread_id = "hw";
@@ -516,7 +544,7 @@ void handle_connections(int tindex)
                 std::cerr << thread_id << " waiting connection on http_worker_Q "  << std::endl;
 #endif
                 LQ_rec rec = o.http_worker_Q.pop();
-                Socket *peersock = rec.sock;
+                std::unique_ptr<Socket> peersock(rec.sock);
 #ifdef DGDEBUG
                 std::cerr << thread_id << " popped connection from http_worker_Q"  << std::endl;
 #endif
@@ -528,7 +556,7 @@ void handle_connections(int tindex)
                     syslog(LOG_INFO, "%sError accepting. (Ignorable)", thread_id.c_str());
                     continue;
                 }
-                ++dystat->busychildren;
+                BusyChildGuard busy_guard(dystat);
                 ++dystat->conx;
 
 #ifdef DGDEBUG
@@ -537,8 +565,7 @@ void handle_connections(int tindex)
 #else
                 h.handlePeer(*peersock, peersockip, dystat, rec.ct_type); // deal with the connection
 #endif
-                --dystat->busychildren;
-                delete peersock;
+                busy_guard.release();
                 break;
             };
         };
