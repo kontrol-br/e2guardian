@@ -1,7 +1,7 @@
 # Comparativo de vazamento de threads entre v5.3.8 e v5.5
 
 ## Contexto
-A base `work` está alinhada com o release 5.3.8_8 e mantém o pipeline de logging original (fila + `std::ofstream`) descrito em `FatController.cpp`. 【F:src/FatController.cpp†L126-L205】
+A base `work` está alinhada com o release 5.3.8_9 e mantém o pipeline de logging original (fila + `std::ofstream`) descrito em `FatController.cpp`. 【F:src/FatController.cpp†L126-L205】
 A versão oficial 5.5.8r reorganizou o mesmo arquivo para usar o novo `Logger` centralizado e acrescentou flags atômicas para rotação e sincronização das threads de log.【F:analysis/FatController_v5.5_snippets.cpp†L6-L32】
 
 ## Diferenças relevantes
