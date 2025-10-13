@@ -1623,6 +1623,29 @@ int fc_controlit()   //
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
 
+    // Now start creating threads so main thread can just handle signals, list reloads and stats
+    // This removes need for select and/or epoll greatly simplifying the code
+    // Threads are created for logger, a separate thread for each listening port
+    // and an array of worker threads to deal with the work.
+    if (!o.no_logger) {
+        std::thread log_thread(log_listener, o.log_location, o.logconerror, o.log_syslog,o.log_Q);
+        log_thread.detach();
+#ifdef DGDEBUG
+    std::cerr << thread_id << "log_listener thread created" << std::endl;
+#endif
+    }
+
+    if(o.log_requests) {
+        std::thread RQlog_thread(log_listener, o.RQlog_location, o.logconerror, false,o.RQlog_Q);
+        RQlog_thread.detach();
+#ifdef DGDEBUG
+        std::cerr << thread_id << "RQlog_listener thread created" << std::endl;
+#endif
+
+    }
+
+// I am the main thread here onwards.
+
     sigset_t signal_set;
     sigemptyset(&signal_set);
     sigaddset(&signal_set, SIGHUP);
