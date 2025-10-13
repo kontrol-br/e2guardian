@@ -215,13 +215,15 @@ void stat_rec::reset()
         timeinfo = localtime ( &now );
         char buffer [50];
         strftime (buffer,50,"%Y-%m-%d %H:%M",timeinfo);
-        fprintf(fs, "%s %d      %d      %d      %d      %ld     %ld     %ld      %ld    %d       %d
-", buffer, o.http_workers,
-        bc, o.http_worker_Q.size(), o.log_Q->size(), cnx, cps, rqx, rqs, mfd, LC);
+        fprintf(fs,
+            "%s %d      %d      %d      %d      %ld     %ld     %ld      %ld    %d       %d\n",
+            buffer, o.http_workers,
+            bc, o.http_worker_Q.size(), o.log_Q->size(), cnx, cps, rqx, rqs, mfd, LC);
     } else {
-        fprintf(fs, "%ld        %d      %d      %d      %d      %ld     %ld     %ld     %ld     %d      %d
-", now, o.http_workers,
-        bc, o.http_worker_Q.size(), o.log_Q->size(), cnx, cps, rqx, rqs, mfd, LC);
+        fprintf(fs,
+            "%ld        %d      %d      %d      %d      %ld     %ld     %ld     %ld     %d      %d\n",
+            now, o.http_workers,
+            bc, o.http_worker_Q.size(), o.log_Q->size(), cnx, cps, rqx, rqs, mfd, LC);
     }
 
     fflush(fs);
@@ -1714,7 +1716,7 @@ int fc_controlit()   //
     // Threads are created for logger, a separate thread for each listening port
     // and an array of worker threads to deal with the work.
     if (!o.no_logger) {
-        std::thread log_thread(log_listener, o.log_location, o.logconerror, o.log_syslog, o.log_Q);
+        std::thread log_thread(log_listener, o.log_location, o.logconerror, o.log_syslog, o.log_Q, false);
         log_thread.detach();
 #ifdef DGDEBUG
     std::cerr << thread_id << "log_listener thread created" << std::endl;
