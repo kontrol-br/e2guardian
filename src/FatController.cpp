@@ -1623,6 +1623,35 @@ int fc_controlit()   //
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
 
+    sigset_t signal_set;
+    sigemptyset(&signal_set);
+    sigaddset(&signal_set, SIGHUP);
+    sigaddset(&signal_set, SIGPIPE);
+    sigaddset(&signal_set, SIGTERM);
+    sigaddset(&signal_set, SIGUSR1);
+
+#ifdef __OpenBSD__
+    // OpenBSD does not support posix sig_timed_wait, so have to use timer and SIGALRM 
+    // set up timer for main loop
+    struct itimerval timeout;
+    timeout.it_interval.tv_sec = 0;
+    timeout.it_interval.tv_usec = (suseconds_t) 0;
+    timeout.it_value.tv_usec = (suseconds_t) 0;
+    sigaddset(&signal_set, SIGALRM);
+#else
+    struct timespec timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_nsec = (long) 0;
+#endif
+    // Em v5.5 o bloqueio de sinais é feito antes da criação de qualquer thread
+    // para garantir que as novas threads herdem a máscara correta (corrige #815).
+    int stat;
+    stat = pthread_sigmask(SIG_BLOCK, &signal_set, NULL);
+    if (stat != 0) {
+        syslog(LOG_ERR, "%sError setting sigmask", thread_id.c_str());
+        return 1;
+    }
+
     // Now start creating threads so main thread can just handle signals, list reloads and stats
     // This removes need for select and/or epoll greatly simplifying the code
     // Threads are created for logger, a separate thread for each listening port
@@ -1644,39 +1673,7 @@ int fc_controlit()   //
 
     }
 
-// I am the main thread here onwards.
-
-#ifdef DGDEBUG
-    std::cerr << thread_id << "Master thread created threads" << std::endl;
-#endif
-
-
-    sigset_t signal_set;
-    sigemptyset(&signal_set);
-    sigaddset(&signal_set, SIGHUP);
-    sigaddset(&signal_set, SIGPIPE);
-    sigaddset(&signal_set, SIGTERM);
-    sigaddset(&signal_set, SIGUSR1);
-
-#ifdef __OpenBSD__
-    // OpenBSD does not support posix sig_timed_wait, so have to use timer and SIGALRM 
-    // set up timer for main loop
-    struct itimerval timeout;
-    timeout.it_interval.tv_sec = 0;
-    timeout.it_interval.tv_usec = (suseconds_t) 0;
-    timeout.it_value.tv_usec = (suseconds_t) 0;
-    sigaddset(&signal_set, SIGALRM);
-#else
-    struct timespec timeout;
-    timeout.tv_sec = 0;
-    timeout.tv_nsec = (long) 0;
-#endif
-    int stat;
-    stat = pthread_sigmask(SIG_BLOCK, &signal_set, NULL);
-    if (stat != 0) {
-        syslog(LOG_ERR, "%sError setting sigmask", thread_id.c_str());
-        return 1;
-    }
+    // I am the main thread here onwards.
 
 #ifdef DGDEBUG
     std::cerr << thread_id << "sig handlers done" << std::endl;
@@ -1695,7 +1692,7 @@ int fc_controlit()   //
     }
     for (auto &i : http_wt) {
         i.detach();
-   }
+    }
 #ifdef DGDEBUG
     std::cerr << thread_id << "http_worker threads created" << std::endl;
 #endif
@@ -1712,6 +1709,10 @@ int fc_controlit()   //
     }
 #ifdef DGDEBUG
     std::cerr << "listen  threads created" << std::endl;
+#endif
+
+#ifdef DGDEBUG
+    std::cerr << thread_id << "Master thread created threads" << std::endl;
 #endif
 
     time_t tmaxspare;
