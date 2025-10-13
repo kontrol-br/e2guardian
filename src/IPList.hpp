@@ -7,7 +7,9 @@
 
 // INCLUDES
 
+#include <cstdint>
 #include <list>
+#include <vector>
 
 // DECLARATIONS
 

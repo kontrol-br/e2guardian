@@ -572,6 +572,7 @@ void HTTPHeader::setURL(String &url)
         std::cerr << thread_id << " to " << (*pport) << " Line: " << __LINE__ << " Function: " << __func__ << std::endl;
 #endif
     }
+    this->port = static_cast<unsigned int>(port);
     // Don't just cache the URL we're sent - getUrl() performs some other
     // processing, notably stripping the port part. Caching here will
     // bypass all that.
