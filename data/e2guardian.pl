@@ -25,8 +25,8 @@ $hashflag = $in{'HASH'}; # hash flag - can be undefined; 1 = generate GBYPASS; 2
 
 
 print "Content-type: text/html\n\n";
-print '<HTML><HEAD><TITLE>e2guardian - Access Denied</TITLE></HEAD>';
-print '<BODY><CENTER><H2>ACCESS HAS BEEN DENIED</H2>';
+print '<HTML><HEAD><TITLE>Acesso Negado</TITLE></HEAD>';
+print '<BODY><CENTER><H2>ACESSO NEGADO</H2>';
 if (length($user) > 0) {
   print "<br><em>$user</em>, access to the page:<P>";
 }
@@ -74,7 +74,3 @@ sub ReadEnvs {
     $in{$name} = $value;
   }
 }
-
-
-
-
