@@ -129,6 +129,9 @@ std::atomic<bool> gentlereload;
 //static volatile bool sig_term_killall = false;
 std::atomic<bool> reloadconfig ;
 std::atomic<int> reload_cnt;
+std::atomic<bool> rotate_access;
+std::atomic<bool> rotate_request;
+std::atomic<bool> rotate_dstat;
 
 extern OptionContainer o;
 extern bool is_daemonised;
@@ -141,30 +144,33 @@ void stat_rec::clear()
     maxusedfd = 0;
 };
 
-void stat_rec::start()
+void stat_rec::start(bool firsttime)
 {
-    clear();
-    start_int = time(NULL);
-    end_int = start_int + o.dstat_interval;
+    if (firsttime) {
+        clear();
+        start_int = time(NULL);
+        end_int = start_int + o.dstat_interval;
+        maxusedfd = 0;
+    }
+
     if (o.dstat_log_flag) {
         mode_t old_umask;
         old_umask = umask(S_IWGRP | S_IWOTH);
         fs = fopen(o.dstat_location.c_str(), "a");
         if (fs) {
-    	   if (o.stats_human_readable){
-               fprintf(fs, "time		        httpw	busy	httpwQ	logQ	conx	conx/s	 reqs	reqs/s	maxfd	LCcnt\n");
-	   } else {
-               fprintf(fs, "time		httpw	busy	httpwQ	logQ	conx	conx/s	reqs	reqs/s	maxfd	LCcnt\n");
-	   }
+           if (o.stats_human_readable){
+               fprintf(fs, "time                        httpw   busy    httpwQ  logQ    conx    conx/s   reqs   reqs/s  maxfd  LCcnt\n");
+           } else {
+               fprintf(fs, "time                httpw   busy    httpwQ  logQ    conx    conx/s  reqs    reqs/s  maxfd   LCcnt\n");
+           }
+           fflush(fs);
         } else {
            syslog(LOG_ERR, "Unable to open dstats_log %s for writing\nContinuing without logging\n",
            o.dstat_location.c_str());
            o.dstat_log_flag = false;
         };
-        maxusedfd = 0;
-        fflush(fs);
         umask(old_umask);
-    };
+    }
 };
 
 void stat_rec::reset()
@@ -189,16 +195,32 @@ void stat_rec::reset()
 
     long cps = cnx / period;
     long rqs = rqx / period;
+
+    if (rotate_dstat.exchange(false)) {
+        if (fs != NULL) {
+            fflush(fs);
+            fclose(fs);
+            fs = NULL;
+        }
+        start(false);
+    }
+
+    if (!o.dstat_log_flag || fs == NULL) {
+        return;
+    }
+
     if (o.stats_human_readable){
         struct tm * timeinfo;
         time( &now);
         timeinfo = localtime ( &now );
         char buffer [50];
         strftime (buffer,50,"%Y-%m-%d %H:%M",timeinfo);
-    	fprintf(fs, "%s	%d	%d	%d	%d	%ld	%ld	%ld	 %ld	%d	 %d\n", buffer, o.http_workers,
+        fprintf(fs, "%s %d      %d      %d      %d      %ld     %ld     %ld      %ld    %d       %d
+", buffer, o.http_workers,
         bc, o.http_worker_Q.size(), o.log_Q->size(), cnx, cps, rqx, rqs, mfd, LC);
     } else {
-        fprintf(fs, "%ld	%d	%d	%d	%d	%ld	%ld	%ld	%ld	%d	%d\n", now, o.http_workers,
+        fprintf(fs, "%ld        %d      %d      %d      %d      %ld     %ld     %ld     %ld     %d      %d
+", now, o.http_workers,
         bc, o.http_worker_Q.size(), o.log_Q->size(), cnx, cps, rqx, rqs, mfd, LC);
     }
 
@@ -207,7 +229,10 @@ void stat_rec::reset()
 
 void stat_rec::close()
 {
-    if (fs != NULL) fclose(fs);
+    if (fs != NULL) {
+        fclose(fs);
+        fs = NULL;
+    }
 };
 
 
@@ -320,7 +345,7 @@ extern "C" {
 }
 
 // logging & URL cache processes
-void log_listener(std::string log_location, bool logconerror, bool logsyslog, Queue<std::string>* log_Q);
+void log_listener(std::string log_location, bool logconerror, bool logsyslog, Queue<std::string>* log_Q, bool is_RQlog = false);
 
 // fork off into background
 bool daemonise();
@@ -695,8 +720,8 @@ void wait_for_proxy()
 // *
 // *
 
-void log_listener(std::string log_location, bool logconerror, bool logsyslog, Queue<std::string> *log_Q) {
-    thread_id = "log: ";
+void log_listener(std::string log_location, bool logconerror, bool logsyslog, Queue<std::string> *log_Q, bool is_RQlog) {
+    thread_id = is_RQlog ? "logrq: " : "log: ";
     try {
 #ifdef DGDEBUG
     std::cerr << thread_id << "log listener started" << std::endl;
@@ -723,16 +748,30 @@ void log_listener(std::string log_location, bool logconerror, bool logsyslog, Qu
     int headeradded = 0;
 
     std::ofstream *logfile = NULL;
-    if (!logsyslog) {
+    auto reopen_logfile = [&](const char *action) -> bool {
+        if (logsyslog) {
+            return true;
+        }
+        if (logfile != NULL) {
+            logfile->close();
+            delete logfile;
+            logfile = NULL;
+        }
         logfile = new std::ofstream(log_location.c_str(), std::ios::app);
         if (logfile->fail()) {
-            syslog(LOG_ERR, "%sError opening/creating log file.", thread_id.c_str());
+            syslog(LOG_ERR, "%sError %s log file %s.", thread_id.c_str(), action, log_location.c_str());
 #ifdef DGDEBUG
-            std::cerr << thread_id << "Error opening/creating log file: " << log_location << std::endl;
+            std::cerr << thread_id << "Error " << action << " log file: " << log_location << std::endl;
 #endif
             delete logfile;
-            return; // return with error
+            logfile = NULL;
+            return false;
         }
+        return true;
+    };
+
+    if (!reopen_logfile("opening/creating")) {
+        return; // return with error
     }
 
     // Get server name - only needed for format 5
@@ -770,6 +809,18 @@ void log_listener(std::string log_location, bool logconerror, bool logsyslog, Qu
         std::string loglines;
         loglines.append(log_Q->pop());  // get logdata from queue
         if (logger_ttg) break;
+
+        if (!logsyslog) {
+            bool rotate_now = is_RQlog ? rotate_request.exchange(false) : rotate_access.exchange(false);
+            if (rotate_now) {
+                if (!reopen_logfile("re-opening")) {
+                    return;
+                }
+#ifdef DGDEBUG
+                std::cerr << thread_id << "log file rotation requested" << std::endl;
+#endif
+            }
+        }
 #ifdef DGDEBUG
         std::cerr << thread_id << "received a log request" <<  loglines << std::endl;
 #endif
@@ -1302,6 +1353,7 @@ void log_listener(std::string log_location, bool logconerror, bool logsyslog, Qu
     if (logfile) {
         logfile->close(); // close the file
         delete logfile;
+        logfile = NULL;
     }
     } catch (...) {
         syslog(LOG_ERR,"%slog_listener caught unexpected exception - exiting", thread_id.c_str());
@@ -1414,6 +1466,9 @@ int fc_controlit()   //
     reloadconfig = false;
     gentlereload = false;
     reload_cnt = 0;
+    rotate_access = false;
+    rotate_request = false;
+    rotate_dstat = false;
 
     o.lm.garbageCollect();
     thread_id = "master: ";
@@ -1623,34 +1678,6 @@ int fc_controlit()   //
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
 
-    // Now start creating threads so main thread can just handle signals, list reloads and stats
-    // This removes need for select and/or epoll greatly simplifying the code
-    // Threads are created for logger, a separate thread for each listening port
-    // and an array of worker threads to deal with the work.
-    if (!o.no_logger) {
-        std::thread log_thread(log_listener, o.log_location, o.logconerror, o.log_syslog,o.log_Q);
-        log_thread.detach();
-#ifdef DGDEBUG
-    std::cerr << thread_id << "log_listener thread created" << std::endl;
-#endif
-    }
-
-    if(o.log_requests) {
-        std::thread RQlog_thread(log_listener, o.RQlog_location, o.logconerror, false,o.RQlog_Q);
-        RQlog_thread.detach();
-#ifdef DGDEBUG
-        std::cerr << thread_id << "RQlog_listener thread created" << std::endl;
-#endif
-
-    }
-
-// I am the main thread here onwards.
-
-#ifdef DGDEBUG
-    std::cerr << thread_id << "Master thread created threads" << std::endl;
-#endif
-
-
     sigset_t signal_set;
     sigemptyset(&signal_set);
     sigaddset(&signal_set, SIGHUP);
@@ -1681,6 +1708,34 @@ int fc_controlit()   //
 #ifdef DGDEBUG
     std::cerr << thread_id << "sig handlers done" << std::endl;
 #endif
+
+    // Now start creating threads so main thread can just handle signals, list reloads and stats
+    // This removes need for select and/or epoll greatly simplifying the code
+    // Threads are created for logger, a separate thread for each listening port
+    // and an array of worker threads to deal with the work.
+    if (!o.no_logger) {
+        std::thread log_thread(log_listener, o.log_location, o.logconerror, o.log_syslog, o.log_Q);
+        log_thread.detach();
+#ifdef DGDEBUG
+    std::cerr << thread_id << "log_listener thread created" << std::endl;
+#endif
+    }
+
+    if(o.log_requests) {
+        std::thread RQlog_thread(log_listener, o.RQlog_location, o.logconerror, false, o.RQlog_Q, true);
+        RQlog_thread.detach();
+#ifdef DGDEBUG
+        std::cerr << thread_id << "RQlog_listener thread created" << std::endl;
+#endif
+
+    }
+
+// I am the main thread here onwards.
+
+#ifdef DGDEBUG
+    std::cerr << thread_id << "Master thread created threads" << std::endl;
+#endif
+
 
     dystat->busychildren = 0; // to keep count of our children
     //
@@ -1782,8 +1837,16 @@ int fc_controlit()   //
                 syslog(LOG_INFO, "%sUnexpected error from sigtimedwait() %d %s", thread_id.c_str(), errno, strerror(errno));
             }
         } else {
-            if (rsig == SIGUSR1)
+            if (rsig == SIGUSR1) {
                 gentlereload = true;
+                rotate_access = true;
+                if (o.log_requests) {
+                    rotate_request = true;
+                }
+                if (o.dstat_log_flag) {
+                    rotate_dstat = true;
+                }
+            }
             if (rsig == SIGTERM)
                 ttg = true;
             if (rsig == SIGHUP)
@@ -1811,8 +1874,16 @@ int fc_controlit()   //
                 syslog(LOG_INFO, "%sUnexpected error from sigtimedwait() %d %s", thread_id.c_str(), errno, strerror(errno));
             }
         } else {
-            if (rc == SIGUSR1)
+            if (rc == SIGUSR1) {
                 gentlereload = true;
+                rotate_access = true;
+                if (o.log_requests) {
+                    rotate_request = true;
+                }
+                if (o.dstat_log_flag) {
+                    rotate_dstat = true;
+                }
+            }
             if (rc == SIGTERM)
                 ttg = true;
             if (rc == SIGHUP)
