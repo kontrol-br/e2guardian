@@ -1646,11 +1646,6 @@ int fc_controlit()   //
 
 // I am the main thread here onwards.
 
-#ifdef DGDEBUG
-    std::cerr << thread_id << "Master thread created threads" << std::endl;
-#endif
-
-
     sigset_t signal_set;
     sigemptyset(&signal_set);
     sigaddset(&signal_set, SIGHUP);
@@ -1671,6 +1666,8 @@ int fc_controlit()   //
     timeout.tv_sec = 0;
     timeout.tv_nsec = (long) 0;
 #endif
+    // Em v5.5 o bloqueio de sinais é feito antes da criação de qualquer thread
+    // para garantir que as novas threads herdem a máscara correta (corrige #815).
     int stat;
     stat = pthread_sigmask(SIG_BLOCK, &signal_set, NULL);
     if (stat != 0) {
@@ -1695,7 +1692,7 @@ int fc_controlit()   //
     }
     for (auto &i : http_wt) {
         i.detach();
-   }
+    }
 #ifdef DGDEBUG
     std::cerr << thread_id << "http_worker threads created" << std::endl;
 #endif
@@ -1712,6 +1709,10 @@ int fc_controlit()   //
     }
 #ifdef DGDEBUG
     std::cerr << "listen  threads created" << std::endl;
+#endif
+
+#ifdef DGDEBUG
+    std::cerr << thread_id << "Master thread created threads" << std::endl;
 #endif
 
     time_t tmaxspare;
