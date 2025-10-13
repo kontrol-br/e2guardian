@@ -2141,9 +2141,9 @@ bool ConnectionHandler::genDenyAccess(Socket &peerconn, String &eheader, String 
         else if (reporting_level == 0) {
             eheader = "HTTP/1.1 200 OK\r\n";
             eheader += "Content-type: text/html\r\n";
-            ebody = "<HTML><HEAD><TITLE>e2guardian - ";
+            ebody = "<HTML><HEAD><TITLE>KONTROL - ";
             ebody += o.language_list.getTranslation(1); // access denied
-            ebody += "</TITLE></HEAD><BODY><CENTER><H1>e2guardian - ";
+            ebody += "</TITLE></HEAD><BODY><CENTER><H1>KONTROL - ";
             ebody += o.language_list.getTranslation(1); // access denied
             ebody += "</H1></CENTER></BODY></HTML>\r\n";
             eheader += "Content-Length: ";
