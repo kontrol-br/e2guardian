@@ -3620,9 +3620,9 @@ std::cerr << thread_id << " -got peer connection - clientip is " << clientip << 
                 doLog(clientuser, clientip, checkme);
             }
 
-
-                proxysock.close(); // close connection to proxy
+            proxysock.close(); // close connection to proxy
         }
+    }
     }
     catch (const std::exception &e)
     {
