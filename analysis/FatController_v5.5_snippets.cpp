@@ -77,3 +77,26 @@ void log_listener(Queue<std::string> *log_Q, bool is_RQlog) {
         // ... processamento de log ...
     }
 }
+
+// Configuração de campos em branco no formato de log (v5.5.8r)
+std::string blank_str;
+if (o.log.use_dash_for_blanks)
+    blank_str = "-";
+else
+    blank_str = "";
+
+if (o.log.use_dash_for_blanks && logline == "") {
+    s = "-";
+} else if (!o.log.use_dash_for_blanks && logline == "-") {
+    s = "";
+} else {
+    s = logline;
+}
+
+// Escrita do pid para systemd antes do daemonizar (v5.5.8r)
+int rc = sysv_writepidfile(pidfilefd, 0); // também fecha o fd
+if (rc != 0) {
+    E2LOGGER_error("Error writing to the e2guardian.pid file: ", strerror(errno));
+    delete[] serversockfds;
+    return false;
+}

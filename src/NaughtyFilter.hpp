@@ -37,6 +37,7 @@ class NaughtyFilter
     bool isTLS = false;     // used in transparent https mode
     String orig_ip;     // used in transparent https mode
     int orig_port = 0;     // used in transparent https mode
+    bool got_orig_ip = false; // used when recovering original destination
 
     // return true or false?
     bool isReturn = false;
