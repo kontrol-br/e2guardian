@@ -3622,11 +3622,10 @@ std::cerr << thread_id << " -got peer connection - clientip is " << clientip << 
 
 
                 proxysock.close(); // close connection to proxy
-
-
         }
-        } catch (std::exception & e)
-        {
+    }
+    catch (const std::exception &e)
+    {
 #ifdef DGDEBUG
         std::cerr << thread_id << " - THTTPS connection handler caught an exception: " << e.what() << " Line: " << __LINE__ << " Function: " << __func__ << std::endl;
 #endif
@@ -3635,8 +3634,8 @@ std::cerr << thread_id << " -got peer connection - clientip is " << clientip << 
 
         // close connection to proxy
         proxysock.close();
-            return -1;
-        }
+        return -1;
+    }
 
     return 0;
 }
