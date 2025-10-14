@@ -65,6 +65,7 @@ class OptionContainer
     bool use_xforwardedfor = false;
     std::deque<String> xforwardedfor_filter_ip;
     bool logconerror = false;
+    bool use_original_ip_port = false;
     bool logchildprocs = false;
     bool log_ssl_errors = false;
     int url_cache_number = 0;

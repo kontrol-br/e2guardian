@@ -456,21 +456,81 @@ ConnectionHandler::sendFile(Socket *peerconn, NaughtyFilter &cm, String &url, bo
     return sent;
 }
 
+bool
+ConnectionHandler::get_original_ip_port(NaughtyFilter &checkme, Socket &peerconn, bool log_error)
+{
+    sockaddr_in origaddr;
+    socklen_t origaddrlen(sizeof(sockaddr_in));
+
+#ifdef SOL_IP
+#ifndef SO_ORIGINAL_DST
+#define SO_ORIGINAL_DST 80
+#endif
+    if (getsockopt(peerconn.getFD(), SOL_IP, SO_ORIGINAL_DST, &origaddr, &origaddrlen) < 0)
+#else
+    if (getsockname(peerconn.getFD(), (struct sockaddr *)&origaddr, &origaddrlen) < 0)
+#endif
+    {
+        int saved_errno = errno;
+        checkme.orig_ip = "";
+        checkme.orig_port = 0;
+        checkme.got_orig_ip = false;
+        if (log_error)
+            syslog(LOG_ERR, "%sFailed to get client's original destination IP: %s", thread_id.c_str(), strerror(saved_errno));
+        return false;
+    }
+
+    char res[INET_ADDRSTRLEN];
+    checkme.orig_ip = inet_ntop(AF_INET, &origaddr.sin_addr, res, sizeof(res));
+    if (checkme.orig_ip == peerconn.getLocalIP()) {
+        checkme.orig_ip = "";
+        checkme.orig_port = 0;
+        checkme.got_orig_ip = false;
+        return false;
+    }
+
+    if (!checkme.orig_ip.empty()) {
+        for (auto &ip : o.filter_ip) {
+            if (checkme.orig_ip == ip) {
+                checkme.orig_ip.clear();
+                checkme.orig_port = 0;
+                checkme.got_orig_ip = false;
+                return false;
+            }
+        }
+        for (auto &ip : o.check_ip) {
+            if (checkme.orig_ip == ip) {
+                checkme.orig_ip.clear();
+                checkme.orig_port = 0;
+                checkme.got_orig_ip = false;
+                return false;
+            }
+        }
+    }
+
+    checkme.orig_port = ntohs(origaddr.sin_port);
+    checkme.got_orig_ip = true;
+    return true;
+}
+
 int
 ConnectionHandler::connectUpstream(Socket &sock, NaughtyFilter &cm, int port = 0)   // connects to to proxy or directly
 {
     if (port == 0)
         port = cm.request_header->port;
-    String sport(port);
+
+    auto port_is_filter_port = [this](int candidate) {
+        String sport(candidate);
+        for (auto it = o.filter_ports.begin(); it != o.filter_ports.end(); it++) {
+            if (*it == sport)
+                return true;
+        }
+        return false;
+    };
+
     int lerr_mess = 0;
     int retry = -1;
-    bool may_be_loop = false;
-    for (auto it = o.filter_ports.begin(); it != o.filter_ports.end(); it++) {
-        if (*it == sport) {
-            may_be_loop = true;
-            break;
-        }
-    }
+    bool may_be_loop = port_is_filter_port(port);
 #ifdef DGDEBUG
     std::cerr << thread_id << "May_be_loop = " << may_be_loop << " "  << " port " << port << std::endl;
 #endif
@@ -486,8 +546,20 @@ ConnectionHandler::connectUpstream(Socket &sock, NaughtyFilter &cm, int port = 0
         cm.upfailure = false;
         if (cm.isdirect) {
             String des_ip;
-            if (cm.isiphost) {
+            bool use_direct_ip = false;
+            if (o.use_original_ip_port && cm.got_orig_ip && (cm.connect_site == cm.urldomain) && !cm.orig_ip.empty()) {
+                des_ip = cm.orig_ip;
+                use_direct_ip = true;
+                if (cm.orig_port > 0 && cm.orig_port != port) {
+                    port = cm.orig_port;
+                    may_be_loop = port_is_filter_port(port);
+                }
+            } else if (cm.isiphost) {
                 des_ip = cm.urldomain;
+                use_direct_ip = true;
+            }
+
+            if (use_direct_ip) {
                 if (may_be_loop) {  // check check_ip list
                     bool do_break = false;
                     if (o.check_ip.size() > 0) {
@@ -827,6 +899,9 @@ int ConnectionHandler::handleConnection(Socket &peerconn, String &ip, bool ismit
 //
             // do this normalisation etc just the once at the start.
             checkme.setURL(ismitm);
+
+            if (o.use_original_ip_port && !header.isProxyRequest)
+                get_original_ip_port(checkme, peerconn);
 
             if(o.log_requests) {
                 std::string fnt;
@@ -3343,27 +3418,8 @@ std::cerr << thread_id << " -got peer connection - clientip is " << clientip << 
 
             ++dystat->reqs;
         }
-        }
-        {   // get original IP destination & port
-
-                sockaddr_in origaddr;
-                socklen_t origaddrlen(sizeof(sockaddr_in));
-                if (
-#ifdef SOL_IP       // linux
-#define SO_ORIGINAL_DST 80
-                        getsockopt(peerconn.getFD(), SOL_IP, SO_ORIGINAL_DST, &origaddr, &origaddrlen ) < 0
-#else                       // BSD
-                        getsockname(peerconn.getFD(), (struct sockaddr *)&origaddr, &origaddrlen) < 0
-#endif
-                ) {
-                    syslog(LOG_ERR, "%sFailed to get client's original destination IP: %s", thread_id.c_str(), strerror(errno));
-                    return -1;
-                } else {
-                     char res[INET_ADDRSTRLEN];
-                    checkme.orig_ip = inet_ntop(AF_INET,&origaddr.sin_addr,res,sizeof(res));
-                    checkme.orig_port = ntohs(origaddr.sin_port);
-                }
-         }
+        if (!get_original_ip_port(checkme, peerconn, true))
+            return -1;
 
         if(!checkme.hasSNI) {
         checkme.url = checkme.orig_ip;
@@ -3566,11 +3622,10 @@ std::cerr << thread_id << " -got peer connection - clientip is " << clientip << 
 
 
                 proxysock.close(); // close connection to proxy
-
-
         }
-        } catch (std::exception & e)
-        {
+    }
+    catch (const std::exception &e)
+    {
 #ifdef DGDEBUG
         std::cerr << thread_id << " - THTTPS connection handler caught an exception: " << e.what() << " Line: " << __LINE__ << " Function: " << __func__ << std::endl;
 #endif
@@ -3579,8 +3634,8 @@ std::cerr << thread_id << " -got peer connection - clientip is " << clientip << 
 
         // close connection to proxy
         proxysock.close();
-            return -1;
-        }
+        return -1;
+    }
 
     return 0;
 }
