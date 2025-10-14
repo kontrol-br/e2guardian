@@ -96,6 +96,8 @@ class ConnectionHandler
 
     String dns_error(int herror);
 
+    bool get_original_ip_port(NaughtyFilter &checkme, Socket &peerconn, bool log_error = false);
+
     // write a log entry containing the given data (if required)
   //  void doLog(std::string &who, std::string &from, String &where, unsigned int &port,
   //      std::string &what, String &how, off_t &size, std::string *cat, bool isnaughty, int naughtytype,

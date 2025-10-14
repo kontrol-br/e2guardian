@@ -568,7 +568,13 @@ usexforwardedfor = off
 # it on or off
 logconnectionhandlingerrors = on
 
-#sets the number of worker threads to use 
+# When enabled, transparent connections intercepted via iptables/pf will reuse
+# the original destination IP/port retrieved from the kernel.  This prevents
+# reconnect attempts from looping back to the proxy IP (e.g. 127.0.0.1) and
+# keeps access logs aligned with the real upstream address. on | off
+useoriginalip = off
+
+#sets the number of worker threads to use
 #
 # This figure is the maximum number of concurrent connections.
 # If more connections are made, connections will queue until a worker thread is free.

@@ -1,0 +1,1 @@
+New useoriginalip option - solves issues with some apps who use non-stqndard SNI.

@@ -130,6 +130,11 @@ void NaughtyFilter::reset()
     isGrey = false;
     isSSLGrey = false;
     isSearch = false;
+    hasSNI = false;
+    isTLS = false;
+    orig_ip = "";
+    orig_port = 0;
+    got_orig_ip = false;
     message_no = 0;
     is_text = false;
     filtergroup = 0;

@@ -1,0 +1,9 @@
+# Extract from e2guardian v5.5.8r sample config
+#useoriginalip = on
+# This option only applies when request is transparent (http or https),
+# when no upstream proxy is used, and where it is possible to detect
+# the original destination ip & port
+# When enabled the upstream request will be directed at the original ip and port
+# and no DNS lookup will be performed.
+# This solves the 'snapchat' issue and also should increase speed of connection.
+# Currently this ONLY works on linux systems.

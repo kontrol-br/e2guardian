@@ -701,6 +701,11 @@ bool OptionContainer::read(std::string& filename, int type)
         } else {
             logconerror = false;
         }
+        if (findoptionS("useoriginalip") == "on") {
+            use_original_ip_port = true;
+        } else {
+            use_original_ip_port = false;
+        }
         if (findoptionS("logchildprocesshandling") == "on") {
             logchildprocs = true;
         } else {
