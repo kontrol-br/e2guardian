@@ -3395,6 +3395,11 @@ std::cerr << thread_id << " -got peer connection - clientip is " << clientip << 
             gettimeofday(&checkme.thestart, NULL);
 
 
+            // Record the client IP before StoryA runs so the transparent HTTPS
+            // pre-auth storyboard can apply client-based policies (including
+            // banned IP lookups) just like the HTTP path does.
+            checkme.clientip = clientip;
+
             // Look up reverse DNS name of client if needed
             if (o.reverse_client_ip_lookups) {
                 getClientFromIP(clientip.c_str(), checkme.clienthost);
@@ -3459,7 +3464,6 @@ std::cerr << thread_id << " -got peer connection - clientip is " << clientip << 
 
             // is this user banned?
             isbanneduser = false;
-            checkme.clientip = clientip;
 
 
             if(checkme.hasSNI) checkme.ismitmcandidate = ldl->fg[filtergroup]->ssl_mitm;
