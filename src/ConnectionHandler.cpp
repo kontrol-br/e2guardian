@@ -2176,7 +2176,10 @@ bool ConnectionHandler::denyAccess(Socket *peerconn, Socket *proxysock, HTTPHead
 
     // we blocked the request, so flush the client connection & close the proxy connection.
     if ((*checkme).isItNaughty) {
-        (*peerconn).breadyForOutput(o.proxy_timeout); //as best a flush as I can
+        // Avoid keeping the worker thread blocked on slow or stalled clients.
+        // `writeString()` already performs a blocking flush, so a non-blocking
+        // readiness check is sufficient before we drop the connection.
+        (*peerconn).readyForOutput();
         (*proxysock).close(); // close connection to proxy
         // we said no to the request, so return true, indicating exit the connhandler
         return true;
