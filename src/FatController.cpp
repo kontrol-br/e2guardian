@@ -523,30 +523,12 @@ bool daemonise()
 
 // handle any connections received by this thread
 namespace {
-class BusyChildGuard {
-public:
-    explicit BusyChildGuard(stat_rec *stats) : stats_(stats) {
-        if (stats_) {
-            ++stats_->busychildren;
-        }
-    }
-
-    BusyChildGuard(const BusyChildGuard &) = delete;
-    BusyChildGuard &operator=(const BusyChildGuard &) = delete;
-
-    ~BusyChildGuard() {
-        release();
-    }
-
-    void release() {
-        if (stats_) {
-            --stats_->busychildren;
-            stats_ = nullptr;
-        }
-    }
-
-private:
-    stat_rec *stats_;
+struct BusyGuard {
+    std::atomic<int> &ref;
+    explicit BusyGuard(std::atomic<int> &r) : ref(r) { ++ref; }
+    BusyGuard(const BusyGuard &) = delete;
+    BusyGuard &operator=(const BusyGuard &) = delete;
+    ~BusyGuard() noexcept { --ref; }
 };
 } // namespace
 
@@ -577,14 +559,20 @@ void handle_connections(int tindex)
 #endif
                 if (ttg) break;
 
+                if (!peersock) {
+//            if (o.logconerror)
+                    syslog(LOG_INFO, "%sError accepting. (Ignorable)", thread_id.c_str());
+                    continue;
+                }
+
                 String peersockip = peersock->getPeerIP();
                 if (peersock->getFD() < 0 || peersockip.length() < 7) {
 //            if (o.logconerror)
                     syslog(LOG_INFO, "%sError accepting. (Ignorable)", thread_id.c_str());
                     continue;
                 }
-                BusyChildGuard busy_guard(dystat);
                 ++dystat->conx;
+                BusyGuard busy_guard(dystat->busychildren);
 
 #ifdef DGDEBUG
                 int rc = h.handlePeer(*peersock, peersockip, dystat, rec.ct_type); // deal with the connection
@@ -592,7 +580,6 @@ void handle_connections(int tindex)
 #else
                 h.handlePeer(*peersock, peersockip, dystat, rec.ct_type); // deal with the connection
 #endif
-                busy_guard.release();
                 break;
             };
         };
