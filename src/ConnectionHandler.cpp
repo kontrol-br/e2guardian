@@ -3282,6 +3282,8 @@ std::cerr << thread_id << " -got peer connection - clientip is " << clientip << 
         bool isbanneduser = false;
         bool firsttime = true;
 
+        std::string room;
+
         AuthPlugin *auth_plugin = NULL;
 
         // RFC states that connections are persistent
@@ -3416,6 +3418,7 @@ std::cerr << thread_id << " -got peer connection - clientip is " << clientip << 
 #endif
             checkme.isItNaughty = checkme.isBlocked;
             bool isbannedip = checkme.isBlocked;
+            bool part_banned = false;
 
             //
             //
@@ -3462,28 +3465,32 @@ std::cerr << thread_id << " -got peer connection - clientip is " << clientip << 
             if(checkme.hasSNI) checkme.ismitmcandidate = ldl->fg[filtergroup]->ssl_mitm;
 
 
-            // TODO restore this for THTTPS ??
-            //if (isbannedip) {
-               // matchedip = clienthost == NULL;
-            //} else {
-            // /   if (ldl->inRoom(clientip, room, clienthost, &isbannedip, &part_banned, &checkme.isexception,
-            // /                   checkme.urld)) {
+            if (isbannedip) {
+                matchedip = clienthost == NULL;
+            } else {
+                // Room-level policies (e.g. blanket "Deny All" groups) are expressed via
+                // LOptionContainer::rooms and piggyback on the banned-IP flag.  Honour the
+                // same contracts for transparent HTTPS so that those room definitions block
+                // consistently regardless of protocol.
+                if (ldl->inRoom(clientip, room, clienthost, &isbannedip, &part_banned, &checkme.isexception,
+                                checkme.urld)) {
 #ifdef DGDEBUG
-            // /       std::cerr << " isbannedip = " << isbannedip << "ispart_banned = " << part_banned << " isexception = " << checkme.isexception << std::endl;
+                    std::cerr << thread_id << " isbannedip = " << isbannedip << "ispart_banned = " << part_banned
+                              << " isexception = " << checkme.isexception << std::endl;
 #endif
-          //.          if (isbannedip) {
-                 //       matchedip = clienthost == NULL;
-            //            checkme.isBlocked = checkme.isItNaughty = true;
-            // /       }
-            //        if (checkme.isexception) {
+                    if (isbannedip) {
+                        matchedip = clienthost == NULL;
+                        checkme.isBlocked = checkme.isItNaughty = true;
+                    }
+                    if (checkme.isexception) {
                         // do reason codes etc
-                        //checkme.exceptionreason = o.language_list.getTranslation(630);
-                        //checkme.exceptionreason.append(room);
-                        //checkme.exceptionreason.append(o.language_list.getTranslation(631));
-                        //checkme.message_no = 632;
-                    //}
-                //}
-            //}
+                        checkme.exceptionreason = o.language_list.getTranslation(630);
+                        checkme.exceptionreason.append(room);
+                        checkme.exceptionreason.append(o.language_list.getTranslation(631));
+                        checkme.message_no = 632;
+                    }
+                }
+            }
 
             //
             // Start of exception checking
