@@ -28,6 +28,7 @@ exceptionclientlist
 # to allow for machines to update without user authentication
 #
 authexceptioniplist
+authexceptionsiteiplist
 authexceptionsitelist
 authexceptionurllist
 

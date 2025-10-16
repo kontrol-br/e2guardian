@@ -18,7 +18,8 @@ SAMPLELISTS = domainsnobypass \
         urlnobypass \
         newbannedphraselist \
         newexceptionphraselist \
-        newweightedphraselist
+        newweightedphraselist \
+        filtergroupslist
 
 EXTRA_DIST = domainsnobypass.in \
              ipnobypass \

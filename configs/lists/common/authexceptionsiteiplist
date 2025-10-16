@@ -1,0 +1,12 @@
+#Access allowed prior to authentication
+# IP site addresses (deprecated name)
+#
+# This list mirrors authexceptioniplist and is retained for
+# compatibility with packaging expecting the historic filename.
+# Single IPs, ranges and subnets can be used,
+# e.g.
+# 192.168.0.1
+# 10.0.0.1-10.0.0.3
+# 10.0.0.0/24
+#
+# New deployments should use authexceptioniplist.
