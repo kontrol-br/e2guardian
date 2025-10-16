@@ -5,6 +5,7 @@ E2DATADIR = $(E2CONFDIR)/lists
 SUBDIRS = .
 
 SAMPLELISTS = authexceptioniplist \
+authexceptionsiteiplist \
 authexceptionsitelist \
 authexceptionurllist \
 bannedclientlist \
