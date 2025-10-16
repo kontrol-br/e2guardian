@@ -10,7 +10,7 @@ PHRASELISTS = badwords chat drugadvocacy gambling games goodphrases \
 
 install-data-local:
 	for l in $(PHRASELISTS); do \
-		$(MKDIR_P) $(DESTDIR)$(E2DATADIR)/$$l; \\
+		$(MKDIR_P) $(DESTDIR)$(E2DATADIR)/$$l; \
 		for f in $(srcdir)/$$l/weighted* $(srcdir)/$$l/exception* $(srcdir)/$$l/banned*; do \
 		   if test -f $$f ; then \
 			echo "$(INSTALL_DATA) $$f $(DESTDIR)$(E2DATADIR)/$$l"; \
@@ -33,8 +33,8 @@ dist-hook:
 	    || mkdir $(distdir)/$$phrase \
 	    || exit 1; \
 	    for f in $(srcdir)/$$phrase/weighted* $(srcdir)/$$phrase/banned* $(srcdir)/$$phrase/exception*; do \
-	      if test -f $$f ; then \
-	        cp -p $$f $(distdir)/$$phrase ;\
+              if test -f $$f ; then \
+                cp -p $$f $(distdir)/$$phrase ; \
 	      fi; \
 	    done; \
 	  fi; \

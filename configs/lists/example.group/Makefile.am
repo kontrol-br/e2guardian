@@ -93,14 +93,14 @@ weightedphraselist.in \
 oldweightedphraselist.in
 
 install-data-local:
-	$(MKDIR_P) $(DESTDIR)$(E2DATADIR); \\
-	for l in $(SAMPLELISTS) ; do \\
-		if test ! -f $(DESTDIR)$(E2DATADIR)/$$l ; then \\
-			echo "$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l"; \\
-			$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l; \\
-		fi; \\
-		echo "$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l.sample"; \\
-		$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l.sample; \\
+	$(MKDIR_P) $(DESTDIR)$(E2DATADIR); \
+        for l in $(SAMPLELISTS) ; do \
+                if test ! -f $(DESTDIR)$(E2DATADIR)/$$l ; then \
+			echo "$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l"; \
+			$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l; \
+		fi; \
+		echo "$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l.sample"; \
+		$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l.sample; \
 	done
 uninstall-local:
 	for l in $(SAMPLELISTS) ; do \

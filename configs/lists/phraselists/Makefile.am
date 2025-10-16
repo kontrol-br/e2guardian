@@ -9,7 +9,7 @@ MYSUBDIRS = chinesebig5 chinesegb2312 danish dutch french german italian japanes
 
 
 #install-data-local:
-#	$(MKDIR_P) $(DESTDIR)$(E2DATADIR); \\
+#	$(MKDIR_P) $(DESTDIR)$(E2DATADIR); \
 #		for l in $(WLISTS) ; do \
 #		echo "$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l"; \
 #		$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l; \
@@ -38,7 +38,7 @@ install-data-local:
 	for lang in $(MYSUBDIRS); do \
 	for l in $(PHRASELISTS); do \
 	        if test -d $(srcdir)/$$lang/$$l ; then \
-	        $(MKDIR_P) $(DESTDIR)$(E2DATADIR)/$$lang/$$l; \\
+	        $(MKDIR_P) $(DESTDIR)$(E2DATADIR)/$$lang/$$l; \
 		for f in $(srcdir)/$$lang/$$l/weighted* $(srcdir)/$$lang/$$l/exception* $(srcdir)/$$lang/$$l/banned*; do \
 		   if test -f $$f ; then \
 			echo "$(INSTALL_DATA) $$f $(DESTDIR)$(E2DATADIR)/$$lang/$$l"; \
@@ -50,7 +50,7 @@ install-data-local:
 	done
 	for compat in $(COMPAT_DIRS); do \
 	        if test -d $(srcdir)/../oldphraselists/$$compat ; then \
-	                $(MKDIR_P) $(DESTDIR)$(E2DATADIR)/$$compat; \\
+	                $(MKDIR_P) $(DESTDIR)$(E2DATADIR)/$$compat; \
 	                for f in $(srcdir)/../oldphraselists/$$compat/weighted* \
 	                         $(srcdir)/../oldphraselists/$$compat/exception* \
 	                         $(srcdir)/../oldphraselists/$$compat/banned*; do \
@@ -86,8 +86,8 @@ dist-hook:
 	    || mkdir $(distdir)/$$lang/$$phrase \
 	    || exit 1; \
 	    for f in $(srcdir)/$$lang/$$phrase/weighted* $(srcdir)/$$lang/$$phrase/banned* $(srcdir)/$$lang/$$phrase/exception*; do \
-	      if test -f $$f ; then \
-	        cp -p $$f $(distdir)/$$lang/$$phrase ;\
+              if test -f $$f ; then \
+                cp -p $$f $(distdir)/$$lang/$$phrase ; \
 	      fi; \
 	    done; \
 	  fi; \
