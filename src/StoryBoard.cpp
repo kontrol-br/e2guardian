@@ -447,7 +447,7 @@ bool StoryBoard::runFunct(unsigned int fID, NaughtyFilter &cm) {
             case SB_STATE_EXTENSIONIN:
                 target = cm.response_header->disposition();
                 if (target.length() > 4)
-                     isListCheck = true;
+                    isListCheck = true;
                 target2 = "";
                 break;
             case SB_STATE_MIMEIN:
