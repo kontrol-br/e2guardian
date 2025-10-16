@@ -13,7 +13,7 @@ EXTRA_DIST = e2guardian.in logrotation.in bsd-init.in\
 	     e2guardian.service.in
 
 install-data-local:
-	$(MKDIR_P) $(DESTDIR)$(DATATOPDIR); \\
+	$(MKDIR_P) $(DESTDIR)$(DATATOPDIR)
 	for l in $(FLISTS) ; do \
 		echo "$(INSTALL_DATA) $$l $(DESTDIR)$(DATATOPDIR)/$$l"; \
 		$(INSTALL_DATA) $$l $(DESTDIR)$(DATATOPDIR)/$$l; \

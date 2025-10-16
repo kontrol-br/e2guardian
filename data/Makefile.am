@@ -9,9 +9,9 @@ FLISTS = transparent1x1.gif e2guardian.pl blockedflash.swf
 EXTRA_DIST = $(FLISTS)
 
 install-data-local:
-	$(MKDIR_P) $(DESTDIR)$(DATATOPDIR); \\
-	$(MKDIR_P) $(DESTDIR)$(E2LOGLOCATION); \\
-	$(MKDIR_P) $(DESTDIR)$(E2PIDDIR); \\
+	$(MKDIR_P) $(DESTDIR)$(DATATOPDIR)
+	$(MKDIR_P) $(DESTDIR)$(E2LOGLOCATION)
+	$(MKDIR_P) $(DESTDIR)$(E2PIDDIR)
 	for l in $(FLISTS) ; do \
 		echo "$(INSTALL_DATA) $$l $(DESTDIR)$(DATATOPDIR)/$$l"; \
 		$(INSTALL_DATA) $$l $(DESTDIR)$(DATATOPDIR)/$$l; \
