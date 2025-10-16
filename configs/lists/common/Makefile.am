@@ -1,10 +1,10 @@
 DISTCLEANFILES = Makefile.in 
 
-E2DATADIR = $(E2CONFDIR)/lists/common
+E2DATADIR = $(E2CONFDIR)/lists
 
-SUBDIRS = . 
+SUBDIRS = .
 
-WLISTS = authexceptioniplist \
+SAMPLELISTS = authexceptioniplist \
 authexceptionsitelist \
 authexceptionurllist \
 bannedclientlist \
@@ -23,20 +23,19 @@ nologurllist \
 nomitmsiteiplist \
 nomitmsitelist \
 searchregexplist \
-searchexceptionregexplist \
-README
+searchexceptionregexplist
  
 EXTRA_DIST = 
 
-install-data-local: 
-	$(mkinstalldirs) $(DESTDIR)$(E2DATADIR) && \
-		for l in $(WLISTS) ; do \
-		echo "$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l"; \
-		$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l; \
-	done
+install-data-local:
+        $(mkinstalldirs) $(DESTDIR)$(E2DATADIR) && \
+                for l in $(SAMPLELISTS) ; do \
+                echo "$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l.sample"; \
+                $(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l.sample; \
+        done
 
 
 uninstall-local:
-	for l in $(WLISTS) ; do \
-		rm -f $(DESTDIR)$(E2DATADIR)/$$l ; \
-	done
+        for l in $(SAMPLELISTS) ; do \
+                rm -f $(DESTDIR)$(E2DATADIR)/$$l.sample ; \
+        done

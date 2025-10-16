@@ -22,34 +22,61 @@ MYSUBDIRS = chinesebig5 chinesegb2312 danish dutch french german italian japanes
 #	done
 
 PHRASELISTS = badwords chat drugadvocacy gambling games goodphrases \
-		gore illegaldrugs intolerance \
-		nudism personals pornography \
-		proxies violence warezhacking weapons 
-		
+                gore illegaldrugs intolerance \
+                nudism personals pornography \
+                proxies violence warezhacking weapons
 
-install-data-local: 
-	for lang in $(MYSUBDIRS); do \
-	for l in $(PHRASELISTS); do \
-		if test -d $(srcdir)/$$lang/$$l ; then \
-		$(mkinstalldirs) $(DESTDIR)$(E2DATADIR)/$$lang/$$l && \
+COMPAT_DIRS = badwords chat conspiracy domainsforsale drugadvocacy \
+                forums gambling games goodphrases googlesearches gore \
+                illegaldrugs intolerance legaldrugs malware music news \
+                nudism peer2peer personals pornography proxies rta \
+                safelabel secretsocieties sport translation travel \
+                upstreamfilter violence warezhacking weapons webmail \
+                idtheft
+
+install-data-local:
+        for lang in $(MYSUBDIRS); do \
+        for l in $(PHRASELISTS); do \
+                if test -d $(srcdir)/$$lang/$$l ; then \
+                $(mkinstalldirs) $(DESTDIR)$(E2DATADIR)/$$lang/$$l && \
 		for f in $(srcdir)/$$lang/$$l/weighted* $(srcdir)/$$lang/$$l/exception* $(srcdir)/$$lang/$$l/banned*; do \
 		   if test -f $$f ; then \
 			echo "$(INSTALL_DATA) $$f $(DESTDIR)$(E2DATADIR)/$$lang/$$l"; \
 			$(INSTALL_DATA) $$f $(DESTDIR)$(E2DATADIR)/$$lang/$$l; \
 	           fi \
 		done \
-		fi \
-	done \
-	done 
+                fi \
+        done \
+        done
+        for compat in $(COMPAT_DIRS); do \
+                if test -d $(srcdir)/../oldphraselists/$$compat ; then \
+                        $(mkinstalldirs) $(DESTDIR)$(E2DATADIR)/$$compat && \
+                        for f in $(srcdir)/../oldphraselists/$$compat/weighted* \
+                                 $(srcdir)/../oldphraselists/$$compat/exception* \
+                                 $(srcdir)/../oldphraselists/$$compat/banned*; do \
+                                if test -f $$f ; then \
+                                        echo "$(INSTALL_DATA) $$f $(DESTDIR)$(E2DATADIR)/$$compat/`basename $$f`"; \
+                                        $(INSTALL_DATA) $$f $(DESTDIR)$(E2DATADIR)/$$compat/`basename $$f`; \
+                                fi \
+                        done \
+                fi \
+        done
 
 uninstall-local:
-	for lang in $(MYSUBDIRS); do \
-	for l in $(PHRASELISTS); do \
-		for f in $(srcdir)/$$lang/$$l/weighted* $(srcdir)/$$lang/$$l/exception*; do \
-	        	rm -f $(DESTDIR)$(E2DATADIR)/$$lang/$$l/`basename $$f`; \
-		done \
-	done \
-	done
+        for lang in $(MYSUBDIRS); do \
+        for l in $(PHRASELISTS); do \
+                for f in $(srcdir)/$$lang/$$l/weighted* $(srcdir)/$$lang/$$l/exception*; do \
+                        rm -f $(DESTDIR)$(E2DATADIR)/$$lang/$$l/`basename $$f`; \
+                done \
+        done \
+        done
+        for compat in $(COMPAT_DIRS); do \
+                for f in $(srcdir)/../oldphraselists/$$compat/weighted* \
+                         $(srcdir)/../oldphraselists/$$compat/exception* \
+                         $(srcdir)/../oldphraselists/$$compat/banned*; do \
+                        rm -f $(DESTDIR)$(E2DATADIR)/$$compat/`basename $$f`; \
+                done \
+        done
 
 dist-hook:
 	for lang in $(MYSUBDIRS); do \
