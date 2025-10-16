@@ -672,8 +672,9 @@ configs/e2guardian.conf
 configs/e2guardianf1.conf
 configs/examplef1.story
 configs/Makefile
-configs/lists/Makefile
-configs/lists/common/Makefile
+ configs/lists/Makefile
+ configs/lists/domainsnobypass
+ configs/lists/common/Makefile
 configs/lists/example.group/Makefile
 configs/lists/phraselists/Makefile
 configs/lists/oldphraselists/Makefile

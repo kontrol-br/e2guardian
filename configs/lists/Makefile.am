@@ -1,4 +1,5 @@
-DISTCLEANFILES = Makefile.in 
+DISTCLEANFILES = Makefile.in \
+                 domainsnobypass
 
 E2DATADIR = $(E2CONFDIR)/lists
 
@@ -11,9 +12,10 @@ if NEED_DMLISTS
 SUBDIRS += downloadmanagers
 endif
 
-WLISTS = README
- 
-EXTRA_DIST = 
+WLISTS = README \
+        domainsnobypass
+
+EXTRA_DIST = domainsnobypass.in
 
 install-data-local: 
 	$(mkinstalldirs) $(DESTDIR)$(E2DATADIR) && \

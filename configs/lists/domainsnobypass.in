@@ -1,0 +1,63 @@
+# Users are not allowed to bypass domains in this list
+
+# Don't bother with the www. or the http://
+
+# NOTE: Sites using just IP should be put into bannedsiteiplistwithbypass
+
+# You can include
+#.tld so for example you can match .gov for example
+
+#.Include<@E2CONFDIR@/anotherbannedurllist>
+
+# You can have multiple .Includes.
+
+# WARNING: Old style Blanket blocks in this file will be silently ignored
+
+# .Include<@E2CONFDIR@/lists/blacklists/ads/domains>
+
+# Remove the # from the following and edit as needed to use a stock
+# squidGuard/urlblacklists collection.
+#.Include<@E2CONFDIR@/lists/blacklists/adult/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/aggressive/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/artnudes/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/audio-video/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/beerliquorinfo/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/beerliquorsale/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/chat/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/childcare/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/clothing/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/culinary/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/dialers/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/drugs/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/entertainment/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/forums/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/frencheducation/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/gambling/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/government/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/hacking/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/homerepair/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/hygiene/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/isp/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/jobsearch/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/malware/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/marketingware/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/military/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/mobilesms/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/news/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/porn/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/redirector/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/remotecontrol/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/religion/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/safesearch/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/sciencefiction/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/sexeducation/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/shopping/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/sports/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/tracking/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/violence/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/warez/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/webmail/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/weapons/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/webphone/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/redirector/domains>
+#.Include<@E2CONFDIR@/lists/blacklists/proxy/domains>
