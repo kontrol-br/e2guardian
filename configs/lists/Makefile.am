@@ -25,12 +25,15 @@ EXTRA_DIST = domainsnobypass.in \
              urlnobypass.in
 
 install-data-local:
-	$(mkinstalldirs) $(DESTDIR)$(E2DATADIR) && \
-	for l in $(SAMPLELISTS) ; do \
-	echo "$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l.sample"; \
-	$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l.sample; \
+	$(mkinstalldirs) $(DESTDIR)$(E2DATADIR) \\
+	for l in $(SAMPLELISTS) ; do \\
+		if test ! -f $(DESTDIR)$(E2DATADIR)/$$l ; then \\
+			echo "$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l"; \\
+			$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l; \\
+		fi; \\
+		echo "$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l.sample"; \\
+		$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l.sample; \\
 	done
-
 uninstall-local:
 	for l in $(SAMPLELISTS) ; do \
 	rm -f $(DESTDIR)$(E2DATADIR)/$$l.sample ; \
