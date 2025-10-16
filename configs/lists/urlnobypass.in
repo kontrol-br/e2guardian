@@ -1,0 +1,41 @@
+# Users are not allowed to bypass URLs in this list
+#
+# Do not include the protocol (http:// or https://) or the leading www.
+#
+# Sites served by IP address only should be listed in bannedsiteiplistwithbypass
+# instead of this file.
+#
+# To include additional URL lists, remove the leading # from one or more of
+# the following examples.  You can reference other files inside the
+# configuration directory using @E2CONFDIR@.
+#
+#.Include<@E2CONFDIR@/anotherbannedurllist>
+#
+# Multiple .Include statements are allowed.  Lines beginning with # are
+# treated as comments.
+#
+# Example entries:
+# members.example.com/path
+# bad.example.org/account
+#
+# SquidGuard/urlblacklist collections can be included by uncommenting the
+# categories you wish to use.  Edit the list below to suit your deployment.
+#.Include<@E2CONFDIR@/lists/blacklists/adult/urls>
+#.Include<@E2CONFDIR@/lists/blacklists/aggressive/urls>
+#.Include<@E2CONFDIR@/lists/blacklists/audio-video/urls>
+#.Include<@E2CONFDIR@/lists/blacklists/chat/urls>
+#.Include<@E2CONFDIR@/lists/blacklists/drugs/urls>
+#.Include<@E2CONFDIR@/lists/blacklists/entertainment/urls>
+#.Include<@E2CONFDIR@/lists/blacklists/gambling/urls>
+#.Include<@E2CONFDIR@/lists/blacklists/government/urls>
+#.Include<@E2CONFDIR@/lists/blacklists/hacking/urls>
+#.Include<@E2CONFDIR@/lists/blacklists/jobsearch/urls>
+#.Include<@E2CONFDIR@/lists/blacklists/news/urls>
+#.Include<@E2CONFDIR@/lists/blacklists/porn/urls>
+#.Include<@E2CONFDIR@/lists/blacklists/proxy/urls>
+#.Include<@E2CONFDIR@/lists/blacklists/redirector/urls>
+#.Include<@E2CONFDIR@/lists/blacklists/violence/urls>
+#.Include<@E2CONFDIR@/lists/blacklists/virusinfected/urls>
+#.Include<@E2CONFDIR@/lists/blacklists/warez/urls>
+#
+# Leave the list empty if you do not need to prevent URL based bypassing.

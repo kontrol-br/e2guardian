@@ -674,6 +674,7 @@ configs/examplef1.story
 configs/Makefile
  configs/lists/Makefile
  configs/lists/domainsnobypass
+ configs/lists/urlnobypass
  configs/lists/common/Makefile
 configs/lists/example.group/Makefile
 configs/lists/phraselists/Makefile
