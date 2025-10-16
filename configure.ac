@@ -45,7 +45,7 @@ AC_C_BIGENDIAN
 # check for zlib
 AC_MSG_CHECKING(if zlib should be statically linked)
 AC_ARG_ENABLE(static-zlib,
-[AC_HELP_STRING([--enable-static-zlib@<:@=no@:>@], [Enable static linking of zlib])],
+[AS_HELP_STRING([--enable-static-zlib@<:@=no@:>@], [Enable static linking of zlib])],
 [ if test "x$enableval" = "xno"; then
 staticzlib=false
 AC_MSG_RESULT(no)
@@ -61,7 +61,7 @@ AC_MSG_RESULT(no)
 
 AC_MSG_CHECKING(for zlib)
 AC_ARG_WITH(zlib,
-[AC_HELP_STRING([--with-zlib@<:@=NONE@:>@], [non-standard search path for zlib library])],
+[AS_HELP_STRING([--with-zlib@<:@=NONE@:>@], [non-standard search path for zlib library])],
 [ # check for header & func (in library) in given prefix
 CPPFLAGS="${CPPFLAGS} -I${withval}/include"
 if test "x$staticzlib" = "xtrue"; then
@@ -115,7 +115,7 @@ AC_MSG_RESULT($build_os)
 
 AC_MSG_CHECKING(for debug option)
 AC_ARG_WITH(e2debug,
-[AC_HELP_STRING([--with-e2debug@<:@=off@:>@], [switch on debug build mode])],
+[AS_HELP_STRING([--with-e2debug@<:@=off@:>@], [switch on debug build mode])],
 [if test "x${withval}" = "xoff" ; then
   AC_MSG_RESULT(no)
 else
@@ -129,7 +129,7 @@ fi], [
 
 AC_MSG_CHECKING(for newdebug option)
 AC_ARG_WITH(newdebug,
-[AC_HELP_STRING([--with-newdebug@<:@=off@:>@], [switch off debuglevel build mode])],
+[AS_HELP_STRING([--with-newdebug@<:@=off@:>@], [switch off debuglevel build mode])],
 [if test "x${withval}" = "xon" ; then
   AC_MSG_RESULT(YES)
   AC_DEFINE(NEWDEBUG_ON, 1, [Define to enable debuglevel build mode])
@@ -146,7 +146,7 @@ fi], [
 
 AC_MSG_CHECKING(for netdebug option)
 AC_ARG_WITH(netdebug,
-[AC_HELP_STRING([--with-netdebug@<:@=off@:>@], [switch on netdebug build mode])],
+[AS_HELP_STRING([--with-netdebug@<:@=off@:>@], [switch on netdebug build mode])],
 [if test "x${withval}" = "xoff" ; then
   AC_MSG_RESULT(no)
 else
@@ -160,7 +160,7 @@ fi], [
 
 AC_MSG_CHECKING(for REdebug option)
 AC_ARG_WITH(redebug,
-[AC_HELP_STRING([--with-redebug@<:@=off@:>@], [switch on redebug build mode])],
+[AS_HELP_STRING([--with-redebug@<:@=off@:>@], [switch on redebug build mode])],
 [if test "x${withval}" = "xoff" ; then
   AC_MSG_RESULT(no)
 else
@@ -175,7 +175,7 @@ fi], [
 
 AC_MSG_CHECKING(for proxy user)
 AC_ARG_WITH(proxyuser,
-[AC_HELP_STRING([--with-proxyuser@<:@=nobody@:>@], [name of proxy user])],
+[AS_HELP_STRING([--with-proxyuser@<:@=nobody@:>@], [name of proxy user])],
 [if test "x${withval}" != "x" ; then
   AC_MSG_RESULT(yes)
   proxyuser=${withval}
@@ -192,7 +192,7 @@ AC_SUBST(E2PROXYUSER, "$proxyuser")
 
 AC_MSG_CHECKING(for proxy group)
 AC_ARG_WITH(proxygroup,
-[AC_HELP_STRING([--with-proxygroup@<:@=nobody@:>@], [name of proxy group])],
+[AS_HELP_STRING([--with-proxygroup@<:@=nobody@:>@], [name of proxy group])],
 [if test "x${withval}" != "x" ; then
   AC_MSG_RESULT(yes)
   proxygroup=${withval}
@@ -209,7 +209,7 @@ AC_SUBST(E2PROXYGROUP, "$proxygroup")
 
 AC_MSG_CHECKING(for piddir)
 AC_ARG_WITH(piddir,
-[AC_HELP_STRING([--with-piddir@<:@=${localstatedir}/run@:>@], [path for pid file])],
+[AS_HELP_STRING([--with-piddir@<:@=${localstatedir}/run@:>@], [path for pid file])],
 [if test "x${withval}" != "x" ; then
   AC_MSG_RESULT(yes)
   piddir=${withval}
@@ -228,7 +228,7 @@ AC_SUBST(E2PIDDIR)
 
 AC_MSG_CHECKING(for logdir)
 AC_ARG_WITH(logdir,
-[AC_HELP_STRING([--with-logdir@<:@=${localstatedir}/log/${PACKAGE_NAME}@:>@], [path for log files])],
+[AS_HELP_STRING([--with-logdir@<:@=${localstatedir}/log/${PACKAGE_NAME}@:>@], [path for log files])],
 [if test "x${withval}" != "x" ; then
   AC_MSG_RESULT(yes)
   logdir=${withval}
@@ -250,7 +250,7 @@ PKG_PROG_PKG_CONFIG
 AC_MSG_CHECKING(for PCRE support)
 AC_ARG_ENABLE(
 pcre,
-[AC_HELP_STRING([--enable-pcre@<:@=yes@:>@], [Enable support for the PCRE library])],
+[AS_HELP_STRING([--enable-pcre@<:@=yes@:>@], [Enable support for the PCRE library])],
 [ if test "x$enableval" = "xno"; then
 pcre=false
 AC_MSG_RESULT(no)
@@ -266,7 +266,7 @@ AC_MSG_RESULT(yes)
 )
 
 if test "x$pcre" = "xtrue"; then
-PKG_CHECK_MODULES "([PCRE],[libpcre >= 6.0])"
+PKG_CHECK_MODULES([PCRE], [libpcre >= 6.0])
 AC_DEFINE([HAVE_PCRE],[],[Define to enable PCRE support])
 PCRE_LIBS="-lpcreposix ${PCRE_LIBS}"
 else
@@ -309,7 +309,7 @@ fi
 AC_MSG_CHECKING([for large file support])
 AC_ARG_ENABLE(
 lfs,
-[AC_HELP_STRING([--enable-lfs@<:@=yes@:>@], [Enable large file support on 32 bit systems])],
+[AS_HELP_STRING([--enable-lfs@<:@=yes@:>@], [Enable large file support on 32 bit systems])],
 [ if test "x$enableval" = "xno"; then
 AC_MSG_RESULT(no)
 else
@@ -364,7 +364,7 @@ dmlists=false
 AC_MSG_CHECKING(for clamd support)
 AC_ARG_ENABLE(
 clamd,
-[AC_HELP_STRING([--enable-clamd@<:@=no@:>@], [Enable support for the ClamD content scanner])],
+[AS_HELP_STRING([--enable-clamd@<:@=no@:>@], [Enable support for the ClamD content scanner])],
 [ if test "x$enableval" = "xno"; then
 AC_MSG_RESULT(no)
 clamd=false
@@ -390,7 +390,7 @@ AC_SUBST(CLAMDSUPPORT)
 AC_MSG_CHECKING(for avastd support)
 AC_ARG_ENABLE(
 avastd,
-[AC_HELP_STRING([--enable-avastd@<:@=no@:>@], [Enable support for the AvastD content scanner])],
+[AS_HELP_STRING([--enable-avastd@<:@=no@:>@], [Enable support for the AvastD content scanner])],
 [ if test "x$enableval" = "xno"; then
 AC_MSG_RESULT(no)
 avastd=false
@@ -416,7 +416,7 @@ AC_SUBST(AVASTDSUPPORT)
 AC_MSG_CHECKING(for icap support)
 AC_ARG_ENABLE(
 icap,
-[AC_HELP_STRING([--enable-icap@<:@=no@:>@], [Enable support for ICAP AV server content scanner])],
+[AS_HELP_STRING([--enable-icap@<:@=no@:>@], [Enable support for ICAP AV server content scanner])],
 [ if test "x$enableval" = "xno"; then
 AC_MSG_RESULT(no)
 icap=false
@@ -442,7 +442,7 @@ AC_SUBST(ICAPSUPPORT)
 AC_MSG_CHECKING(for kavd support)
 AC_ARG_ENABLE(
 kavd,
-[AC_HELP_STRING([--enable-kavd@<:@=no@:>@], [Enable support for the Kaspersky AV daemon content scanner])],
+[AS_HELP_STRING([--enable-kavd@<:@=no@:>@], [Enable support for the Kaspersky AV daemon content scanner])],
 [ if test "x$enableval" = "xno"; then
 AC_MSG_RESULT(no)
 kavd=false
@@ -468,7 +468,7 @@ AC_SUBST(KAVDSUPPORT)
 AC_MSG_CHECKING(for command-line content scanner support)
 AC_ARG_ENABLE(
 commandline,
-[AC_HELP_STRING([--enable-commandline@<:@=no@:>@], [Enable support for command-line content scanners])],
+[AS_HELP_STRING([--enable-commandline@<:@=no@:>@], [Enable support for command-line content scanners])],
 [ if test "x$enableval" = "xno"; then
 AC_MSG_RESULT(no)
 commandline=false
@@ -500,7 +500,7 @@ AM_CONDITIONAL(NEED_DMLISTS, test "x$dmlists" = "xtrue")
 AC_MSG_CHECKING(for NTLM support)
 AC_ARG_ENABLE(
 ntlm,
-[AC_HELP_STRING([--enable-ntlm@<:@=no@:>@], [Enable support for the NTLM auth plugin])],
+[AS_HELP_STRING([--enable-ntlm@<:@=no@:>@], [Enable support for the NTLM auth plugin])],
 [ if test "x$enableval" = "xno"; then
 AC_MSG_RESULT(no)
 ntlm=false
@@ -513,7 +513,7 @@ AC_DEFINE([ENABLE_NTLM],[],[Define to enable NTLM auth plugin])
 # now need to check if they're using an iconv library, rather
 # than a native iconv implementation
 AC_ARG_WITH(libiconv,
-[AC_HELP_STRING([--with-libiconv@<:@=NONE@:>@], [Specify search path on a system which requires an external iconv library (only used in conjunction with NTLM auth plugin).])],
+[AS_HELP_STRING([--with-libiconv@<:@=NONE@:>@], [Specify search path on a system which requires an external iconv library (only used in conjunction with NTLM auth plugin).])],
 [ # check for header & func (in library) in given prefix
 if test "x$withval" != "x"; then
 CPPFLAGS="${CPPFLAGS} -I${withval}/include"
@@ -558,7 +558,7 @@ AC_SUBST(NTLMSUPPORT)
 AC_MSG_CHECKING(for SSL MITM support)
 AC_ARG_ENABLE(
 sslmitm,
-[AC_HELP_STRING([--enable-sslmitm@<:@=no@:>@], [Enable support for the SSL MITM plugin])],
+[AS_HELP_STRING([--enable-sslmitm@<:@=no@:>@], [Enable support for the SSL MITM plugin])],
 [ if test "x$enableval" = "xno"; then
 	AC_MSG_RESULT(no)
 	sslmitm=false
@@ -570,7 +570,7 @@ else
 	LIBS="${LIBS} -lssl -lcrypto"
 	AC_DEFINE([__SSLMITM],[],[Define to enable SSL MITM ])
 	AC_DEFINE([__SSLCERT],[],[Define to enable SSL CERT ])
-	PKG_CHECK_MODULES "([OPENSSL],[ openssl >= 1.0.1])"
+    PKG_CHECK_MODULES([OPENSSL], [openssl >= 1.0.1])
 fi],
 [
 	AC_MSG_RESULT(no)
@@ -586,7 +586,7 @@ AC_SUBST(SSLMITMSUPPORT)
 AC_MSG_CHECKING(for DNS support)
 AC_ARG_ENABLE(
 dnsauth,
-[AC_HELP_STRING([--enable-dnsauth@<:@=no@:>@], [Enable support for the DNS auth plugin])],
+[AS_HELP_STRING([--enable-dnsauth@<:@=no@:>@], [Enable support for the DNS auth plugin])],
 [ if test "x$enableval" = "xno"; then
 	AC_MSG_RESULT(no)
 	dnsauth=false
@@ -612,7 +612,7 @@ AC_SUBST(DNSAUTHSUPPORT)
 AC_MSG_CHECKING(for email notification support)
 AC_ARG_ENABLE(
 email,
-[AC_HELP_STRING([--enable-email@<:@=no@:>@], [Enable support for email reporting functionality])],
+[AS_HELP_STRING([--enable-email@<:@=no@:>@], [Enable support for email reporting functionality])],
 [ if test "x$enableval" = "xyes"; then
 email=true
 EMAILSUPPORT=""
@@ -635,7 +635,7 @@ AC_DEFINE_UNQUOTED([E2_CONFIGURE_OPTIONS], ["$ac_configure_args"], [Record confi
 libdir="${libdir}/${PACKAGE_NAME}"
 
 AC_ARG_WITH(sysconfsubdir,
-[AC_HELP_STRING([--with-sysconfsubdir@<:@=e2guardian@:>@], [subdirectory under sysconfdir in which to place config files])],
+[AS_HELP_STRING([--with-sysconfsubdir@<:@=e2guardian@:>@], [subdirectory under sysconfdir in which to place config files])],
 [if test "x$withval" != "x"; then
 e2sysconfdir="${sysconfdir}/${withval}"
 else
