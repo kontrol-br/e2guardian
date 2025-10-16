@@ -13,9 +13,11 @@ SUBDIRS += downloadmanagers
 endif
 
 WLISTS = README \
-        domainsnobypass
+        domainsnobypass \
+        ipnobypass
 
-EXTRA_DIST = domainsnobypass.in
+EXTRA_DIST = domainsnobypass.in \
+             ipnobypass
 
 install-data-local: 
 	$(mkinstalldirs) $(DESTDIR)$(E2DATADIR) && \

@@ -1,0 +1,12 @@
+# Users are not allowed to bypass IP addresses in this list
+#
+# Use this list to prevent bypassing filters for specific hosts
+# identified by IP address.
+#
+# Single IPs, ranges, and CIDR subnets can be used, for example:
+# 192.0.2.10
+# 198.51.100.50-198.51.100.60
+# 203.0.113.0/24
+#
+# Lines starting with a # are treated as comments.
+# Leave the list empty to disable IP bypass restrictions.
