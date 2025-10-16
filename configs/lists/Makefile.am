@@ -25,12 +25,19 @@ EXTRA_DIST = domainsnobypass.in \
 install-data-local: 
 	$(mkinstalldirs) $(DESTDIR)$(E2DATADIR) && \
 		for l in $(WLISTS) ; do \
-		echo "$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l"; \
-		$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l; \
+			echo "$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l"; \
+			$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l; \
+	done && \
+		for l in exceptionvirusextensionlist exceptionvirussiteiplist ; do \
+			if test -f contentscanners/$$l ; then \
+				echo "$(INSTALL_DATA) contentscanners/$$l $(DESTDIR)$(E2DATADIR)/$$l"; \
+				$(INSTALL_DATA) contentscanners/$$l $(DESTDIR)$(E2DATADIR)/$$l; \
+			fi; \
 	done
-
-
 uninstall-local:
 	for l in $(WLISTS) ; do \
+		rm -f $(DESTDIR)$(E2DATADIR)/$$l ; \
+	done
+	for l in exceptionvirusextensionlist exceptionvirussiteiplist ; do \
 		rm -f $(DESTDIR)$(E2DATADIR)/$$l ; \
 	done
