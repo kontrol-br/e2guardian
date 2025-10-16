@@ -12,7 +12,7 @@ FLISTS = default.conf
 EXTRA_DIST = default.conf.in
 
 install-data-local:
-	$(MKDIR_P) $(DESTDIR)$(E2DATADIR); \\
+	$(MKDIR_P) $(DESTDIR)$(E2DATADIR); \
 	for l in $(FLISTS) ; do \
 		echo "$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l.sample"; \
 		$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l.sample; \
