@@ -36,7 +36,7 @@ int readEINTR(int fd, char *buf, unsigned int count)
 // wrapper around FD write that restarts on EINTR
 int writeEINTR(int fd, char *buf, unsigned int count)
 {
-return write(fd, buf, count);
+    return write(fd, buf, count);
 //    int rc;
 //    errno = 0;
 //    while (true) { // using the while as a restart point with continue

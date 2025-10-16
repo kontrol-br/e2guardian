@@ -75,30 +75,30 @@ int AuthPlugin::determineGroup(std::string &user, int &fg, StoryBoard & story, N
     String lastcategory;
     u.toLower(); // since the filtergroupslist is read in in lowercase, we should do this.
     user = u.toCharArray(); // also pass back to ConnectionHandler, so appears lowercase in logs
-  //  String ue(u);
-  //  ue += "=";
+    //  String ue(u);
+    //  ue += "=";
 
     //char *i = ldl->filter_groups_list.findStartsWithPartial(ue.toCharArray(), lastcategory);
- //   char *i = uglc.findStartsWithPartial(ue.toCharArray(), lastcategory);
-     cm.user = user;
-     if (!story.runFunctEntry(story_entry,cm)) {
-         int t = get_default(!cm.request_header->isProxyRequest);
-         if (t > 0) {
-             fg = --t;
-             cm.authrec->group_source = "pdef";
-             return E2AUTH_OK;
-         }
+    //   char *i = uglc.findStartsWithPartial(ue.toCharArray(), lastcategory);
+    cm.user = user;
+    if (!story.runFunctEntry(story_entry, cm)) {
+        int t = get_default(!cm.request_header->isProxyRequest);
+        if (t > 0) {
+            fg = --t;
+            cm.authrec->group_source = "pdef";
+            return E2AUTH_OK;
+        }
 #ifdef E2DEBUG
-             std::cerr << "User not in filter groups list for: " << pluginName.c_str() << std::endl;
+        std::cerr << "User not in filter groups list for: " << pluginName.c_str() << std::endl;
 #endif
-             return E2AUTH_NOGROUP;
-      }
+        return E2AUTH_NOGROUP;
+    }
 
 #ifdef E2DEBUG
     std::cerr << "Group found for: " << user.c_str() << " in " << pluginName.c_str() << std::endl;
 #endif
-     fg = cm.filtergroup;
-     return E2AUTH_OK;
+    fg = cm.filtergroup;
+    return E2AUTH_OK;
 }
 
 // take in a configuration file, find the AuthPlugin class associated with the plugname variable, and return an instance
