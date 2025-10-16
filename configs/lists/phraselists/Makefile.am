@@ -35,48 +35,48 @@ COMPAT_DIRS = badwords chat conspiracy domainsforsale drugadvocacy \
                 idtheft
 
 install-data-local:
-        for lang in $(MYSUBDIRS); do \
-        for l in $(PHRASELISTS); do \
-                if test -d $(srcdir)/$$lang/$$l ; then \
-                $(mkinstalldirs) $(DESTDIR)$(E2DATADIR)/$$lang/$$l && \
+	for lang in $(MYSUBDIRS); do \
+	for l in $(PHRASELISTS); do \
+	        if test -d $(srcdir)/$$lang/$$l ; then \
+	        $(mkinstalldirs) $(DESTDIR)$(E2DATADIR)/$$lang/$$l && \
 		for f in $(srcdir)/$$lang/$$l/weighted* $(srcdir)/$$lang/$$l/exception* $(srcdir)/$$lang/$$l/banned*; do \
 		   if test -f $$f ; then \
 			echo "$(INSTALL_DATA) $$f $(DESTDIR)$(E2DATADIR)/$$lang/$$l"; \
 			$(INSTALL_DATA) $$f $(DESTDIR)$(E2DATADIR)/$$lang/$$l; \
 	           fi \
 		done \
-                fi \
-        done \
-        done
-        for compat in $(COMPAT_DIRS); do \
-                if test -d $(srcdir)/../oldphraselists/$$compat ; then \
-                        $(mkinstalldirs) $(DESTDIR)$(E2DATADIR)/$$compat && \
-                        for f in $(srcdir)/../oldphraselists/$$compat/weighted* \
-                                 $(srcdir)/../oldphraselists/$$compat/exception* \
-                                 $(srcdir)/../oldphraselists/$$compat/banned*; do \
-                                if test -f $$f ; then \
-                                        echo "$(INSTALL_DATA) $$f $(DESTDIR)$(E2DATADIR)/$$compat/`basename $$f`"; \
-                                        $(INSTALL_DATA) $$f $(DESTDIR)$(E2DATADIR)/$$compat/`basename $$f`; \
-                                fi \
-                        done \
-                fi \
-        done
+	        fi \
+	done \
+	done
+	for compat in $(COMPAT_DIRS); do \
+	        if test -d $(srcdir)/../oldphraselists/$$compat ; then \
+	                $(mkinstalldirs) $(DESTDIR)$(E2DATADIR)/$$compat && \
+	                for f in $(srcdir)/../oldphraselists/$$compat/weighted* \
+	                         $(srcdir)/../oldphraselists/$$compat/exception* \
+	                         $(srcdir)/../oldphraselists/$$compat/banned*; do \
+	                        if test -f $$f ; then \
+	                                echo "$(INSTALL_DATA) $$f $(DESTDIR)$(E2DATADIR)/$$compat/`basename $$f`"; \
+	                                $(INSTALL_DATA) $$f $(DESTDIR)$(E2DATADIR)/$$compat/`basename $$f`; \
+	                        fi \
+	                done \
+	        fi \
+	done
 
 uninstall-local:
-        for lang in $(MYSUBDIRS); do \
-        for l in $(PHRASELISTS); do \
-                for f in $(srcdir)/$$lang/$$l/weighted* $(srcdir)/$$lang/$$l/exception*; do \
-                        rm -f $(DESTDIR)$(E2DATADIR)/$$lang/$$l/`basename $$f`; \
-                done \
-        done \
-        done
-        for compat in $(COMPAT_DIRS); do \
-                for f in $(srcdir)/../oldphraselists/$$compat/weighted* \
-                         $(srcdir)/../oldphraselists/$$compat/exception* \
-                         $(srcdir)/../oldphraselists/$$compat/banned*; do \
-                        rm -f $(DESTDIR)$(E2DATADIR)/$$compat/`basename $$f`; \
-                done \
-        done
+	for lang in $(MYSUBDIRS); do \
+	for l in $(PHRASELISTS); do \
+	        for f in $(srcdir)/$$lang/$$l/weighted* $(srcdir)/$$lang/$$l/exception*; do \
+	                rm -f $(DESTDIR)$(E2DATADIR)/$$lang/$$l/`basename $$f`; \
+	        done \
+	done \
+	done
+	for compat in $(COMPAT_DIRS); do \
+	        for f in $(srcdir)/../oldphraselists/$$compat/weighted* \
+	                 $(srcdir)/../oldphraselists/$$compat/exception* \
+	                 $(srcdir)/../oldphraselists/$$compat/banned*; do \
+	                rm -f $(DESTDIR)$(E2DATADIR)/$$compat/`basename $$f`; \
+	        done \
+	done
 
 dist-hook:
 	for lang in $(MYSUBDIRS); do \
