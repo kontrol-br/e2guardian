@@ -1,5 +1,6 @@
 DISTCLEANFILES = Makefile.in \
-                 domainsnobypass
+                 domainsnobypass \
+                 urlnobypass
 
 E2DATADIR = $(E2CONFDIR)/lists
 
@@ -14,10 +15,12 @@ endif
 
 WLISTS = README \
         domainsnobypass \
-        ipnobypass
+        ipnobypass \
+        urlnobypass
 
 EXTRA_DIST = domainsnobypass.in \
-             ipnobypass
+             ipnobypass \
+             urlnobypass.in
 
 install-data-local: 
 	$(mkinstalldirs) $(DESTDIR)$(E2DATADIR) && \
