@@ -5,7 +5,8 @@ E2DATADIR = $(E2CONFDIR)/lists/contentscanners
 SUBDIRS = .
 
 WLISTS = exceptionvirusmimetypelist exceptionvirusextensionlist \
-         exceptionvirussitelist exceptionvirusurllist
+         exceptionvirussitelist exceptionvirusurllist \
+         exceptionvirussiteiplist
 
 EXTRA_DIST = $(WLISTS)
 
