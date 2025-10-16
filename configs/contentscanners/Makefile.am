@@ -7,7 +7,7 @@ E2DATADIR = $(E2CONFDIR)/contentscanners
 SUBDIRS = .
 
 
-FLISTS = 
+FLISTS =
 
 if ENABLE_CLAMD
 FLISTS += clamdscan.conf
@@ -32,8 +32,8 @@ endif
 EXTRA_DIST = clamdscan.conf.in avastdscan.conf.in icapscan.conf.in \
              kavdscan.conf.in commandlinescan.conf.in
 
-install-data-local: 
-	$(mkinstalldirs) $(DESTDIR)$(E2DATADIR) && \
+install-data-local:
+	$(MKDIR_P) $(DESTDIR)$(E2DATADIR); \\
 	for l in $(FLISTS) ; do \
 		echo "$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l"; \
 		$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l; \
