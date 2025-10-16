@@ -20,7 +20,7 @@ EXTRA_DIST = proxy-basic.conf ident.conf ip.conf proxy-ntlm.conf \
              proxy-digest.conf port.conf dnsauth.conf proxy-header.conf
 
 install-data-local:
-	$(mkinstalldirs) $(DESTDIR)$(E2DATADIR) && \
+	$(MKDIR_P) $(DESTDIR)$(E2DATADIR); \\
 	for l in $(FLISTS) ; do \
 		echo "$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l.sample"; \
 		$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l.sample; \

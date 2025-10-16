@@ -6,7 +6,7 @@ DISTCLEANFILES = Makefile.in \
 
 E2DATADIR = $(E2CONFDIR)/lists
 
-SUBDIRS = . 
+SUBDIRS = .
 
 SAMPLELISTS = addheaderregexplist \
 bannedsearchoveridelist \
@@ -80,7 +80,7 @@ domainsnobypass \
 urlnobypass \
 weightedphraselist \
 oldweightedphraselist
- 
+
 EXTRA_DIST = bannedphraselist.in \
 oldbannedphraselist.in \
 bannedsitelist.in \
@@ -93,7 +93,7 @@ weightedphraselist.in \
 oldweightedphraselist.in
 
 install-data-local:
-	$(mkinstalldirs) $(DESTDIR)$(E2DATADIR) && \\
+	$(MKDIR_P) $(DESTDIR)$(E2DATADIR); \\
 	for l in $(SAMPLELISTS) ; do \\
 		if test ! -f $(DESTDIR)$(E2DATADIR)/$$l ; then \\
 			echo "$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l"; \\

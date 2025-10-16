@@ -10,9 +10,9 @@ LANGUAGES = 	czech   hebrew      turkish \
 
 EXTRA_DIST= ReadMe
 
-install-data-local: 
+install-data-local:
 	@for l in $(LANGUAGES); do \
-		$(mkinstalldirs) $(DESTDIR)$(LANGDIR)/$$l && \
+		$(MKDIR_P) $(DESTDIR)$(LANGDIR)/$$l; \\
 		for f in $(srcdir)/$$l/messages $(srcdir)/$$l/template.html $(srcdir)/$$l/neterr_template.html $(srcdir)/$$l/fancydmtemplate.html; do \
 			echo "$(INSTALL_DATA) $$f $(DESTDIR)$(LANGDIR)/$$l"; \
 			$(INSTALL_DATA) $$f $(DESTDIR)$(LANGDIR)/$$l; \
@@ -35,4 +35,4 @@ dist-hook:
 	    cp -p $(srcdir)/$$lang/messages $(srcdir)/$$lang/template.html $(srcdir)/$$l/neterr_template.html $(srcdir)/$$lang/fancydmtemplate.html $(distdir)/$$lang \
 	      || exit 1; \
 	  fi; \
-	done		
+	done

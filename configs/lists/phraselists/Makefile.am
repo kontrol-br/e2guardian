@@ -1,15 +1,15 @@
-DISTCLEANFILES = Makefile.in 
+DISTCLEANFILES = Makefile.in
 
 E2DATADIR = $(E2CONFDIR)/lists/phraselists
 
-MYSUBDIRS = chinesebig5 chinesegb2312 danish dutch french german italian japanese malay norwegian polish portuguese russian-1251 russian-koi8-r spanish swedish ukenglish 
+MYSUBDIRS = chinesebig5 chinesegb2312 danish dutch french german italian japanese malay norwegian polish portuguese russian-1251 russian-koi8-r spanish swedish ukenglish
 
 
 #WLISTS = README
- 
 
-#install-data-local: 
-#	$(mkinstalldirs) $(DESTDIR)$(E2DATADIR) && \
+
+#install-data-local:
+#	$(MKDIR_P) $(DESTDIR)$(E2DATADIR); \\
 #		for l in $(WLISTS) ; do \
 #		echo "$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l"; \
 #		$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l; \
@@ -38,7 +38,7 @@ install-data-local:
 	for lang in $(MYSUBDIRS); do \
 	for l in $(PHRASELISTS); do \
 	        if test -d $(srcdir)/$$lang/$$l ; then \
-	        $(mkinstalldirs) $(DESTDIR)$(E2DATADIR)/$$lang/$$l && \
+	        $(MKDIR_P) $(DESTDIR)$(E2DATADIR)/$$lang/$$l; \\
 		for f in $(srcdir)/$$lang/$$l/weighted* $(srcdir)/$$lang/$$l/exception* $(srcdir)/$$lang/$$l/banned*; do \
 		   if test -f $$f ; then \
 			echo "$(INSTALL_DATA) $$f $(DESTDIR)$(E2DATADIR)/$$lang/$$l"; \
@@ -50,7 +50,7 @@ install-data-local:
 	done
 	for compat in $(COMPAT_DIRS); do \
 	        if test -d $(srcdir)/../oldphraselists/$$compat ; then \
-	                $(mkinstalldirs) $(DESTDIR)$(E2DATADIR)/$$compat && \
+	                $(MKDIR_P) $(DESTDIR)$(E2DATADIR)/$$compat; \\
 	                for f in $(srcdir)/../oldphraselists/$$compat/weighted* \
 	                         $(srcdir)/../oldphraselists/$$compat/exception* \
 	                         $(srcdir)/../oldphraselists/$$compat/banned*; do \
@@ -92,6 +92,6 @@ dist-hook:
 	    done; \
 	  fi; \
 	done \
-	done		
+	done
 
 

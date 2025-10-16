@@ -8,8 +8,8 @@ WLISTS = managedmimetypelist managedextensionlist
 
 EXTRA_DIST = $(WLISTS)
 
-install-data-local: 
-	$(mkinstalldirs) $(DESTDIR)$(E2DATADIR) && \
+install-data-local:
+	$(MKDIR_P) $(DESTDIR)$(E2DATADIR); \\
 	for l in $(WLISTS) ; do \
 		echo "$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l"; \
 		$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l; \
