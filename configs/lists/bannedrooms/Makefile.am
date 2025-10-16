@@ -1,6 +1,6 @@
 DISTCLEANFILES = Makefile.in
 
-E2DATADIR = $(E2CONFDIR)/lists/rooms
+E2DATADIR = $(E2CONFDIR)/lists/bannedrooms
 
 SUBDIRS = .
 

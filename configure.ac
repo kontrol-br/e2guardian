@@ -677,7 +677,7 @@ configs/lists/common/Makefile
 configs/lists/example.group/Makefile
 configs/lists/phraselists/Makefile
 configs/lists/oldphraselists/Makefile
-configs/lists/rooms/Makefile
+configs/lists/bannedrooms/Makefile
 configs/lists/contentscanners/Makefile
 configs/lists/example.group/bannedphraselist
 configs/lists/example.group/oldbannedphraselist
