@@ -13,6 +13,10 @@ install-data-local:
 	for l in $(WLISTS) ; do \
 		echo "$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l.sample"; \
 		$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l.sample; \
+		if test ! -f $(DESTDIR)$(E2DATADIR)/$$l ; then \
+			echo "$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l"; \
+			$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l; \
+		fi; \
 	done
 
 
