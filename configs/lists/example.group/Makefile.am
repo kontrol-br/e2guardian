@@ -4,11 +4,11 @@ DISTCLEANFILES = Makefile.in \
 		oldbannedphraselist \
 		oldexceptionphraselist oldweightedphraselist
 
-E2DATADIR = $(E2CONFDIR)/lists/example.group
+E2DATADIR = $(E2CONFDIR)/lists
 
 SUBDIRS = . 
 
-WLISTS = addheaderregexplist \
+SAMPLELISTS = addheaderregexplist \
 bannedsearchoveridelist \
 bannedextensionlist \
 bannedmimetypelist \
@@ -79,8 +79,7 @@ ipnobypass \
 domainsnobypass \
 urlnobypass \
 weightedphraselist \
-oldweightedphraselist \
-README
+oldweightedphraselist
  
 EXTRA_DIST = bannedphraselist.in \
 oldbannedphraselist.in \
@@ -93,15 +92,15 @@ urlnobypass.in \
 weightedphraselist.in \
 oldweightedphraselist.in
 
-install-data-local: 
-	$(mkinstalldirs) $(DESTDIR)$(E2DATADIR) && \
-		for l in $(WLISTS) ; do \
-		echo "$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l"; \
-		$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l; \
-	done
+install-data-local:
+        $(mkinstalldirs) $(DESTDIR)$(E2DATADIR) && \
+                for l in $(SAMPLELISTS) ; do \
+                echo "$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l.sample"; \
+                $(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l.sample; \
+        done
 
 
 uninstall-local:
-	for l in $(WLISTS) ; do \
-		rm -f $(DESTDIR)$(E2DATADIR)/$$l ; \
-	done
+        for l in $(SAMPLELISTS) ; do \
+                rm -f $(DESTDIR)$(E2DATADIR)/$$l.sample ; \
+        done
