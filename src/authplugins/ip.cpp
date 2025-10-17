@@ -12,12 +12,17 @@
 #include "../RegExp.hpp"
 #include "../OptionContainer.hpp"
 
+#include "../NaughtyFilter.hpp"
+#include "../StoryBoard.hpp"
+
 #include <syslog.h>
 #include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <arpa/inet.h>
 #include <unistd.h>
+#include <list>
 #include <vector>
 
 // GLOBALS
@@ -29,17 +34,19 @@ extern thread_local std::string thread_id;
 // DECLARATIONS
 
 // structs linking subnets and IP ranges to filter groups
-//struct subnetstruct
-// uint32_t maskedaddr;
-    //uint32_t mask;
-    //int group;
-//};
+struct ip_subnet_entry
+{
+    uint32_t maskedaddr;
+    uint32_t mask;
+    int group;
+};
 
-//struct rangestruct {
-//    uint32_t startaddr;
-//    uint32_t endaddr;
-//    int group;
-//};
+struct ip_range_entry
+{
+    uint32_t startaddr;
+    uint32_t endaddr;
+    int group;
+};
 
 // class for linking IPs to filter groups, complete with comparison operators
 // allowing standard C++ sort to work
@@ -82,15 +89,15 @@ class ipinstance : public AuthPlugin
     };
 
     int identify(Socket &peercon, Socket &proxycon, HTTPHeader &h, std::string &string, bool &is_real_user, auth_rec &authrec);
-    //int determineGroup(std::string &user, int &fg, ListContainer &uglc);
+    int determineGroup(std::string &user, int &rfg, StoryBoard &story, NaughtyFilter &cm) override;
 
     int init(void *args);
     int quit();
 
     private:
     std::vector<ip> iplist;
-    std::list<subnetstruct> ipsubnetlist;
-    std::list<rangestruct> iprangelist;
+    std::list<ip_subnet_entry> ipsubnetlist;
+    std::list<ip_range_entry> iprangelist;
 
     int readIPMelangeList(const char *filename);
     int searchList(int a, int s, const uint32_t &ip);
@@ -228,7 +235,7 @@ int ipinstance::identify(Socket &peercon, Socket &proxycon, HTTPHeader &h, std::
     return E2AUTH_OK;
 }
 
-int ipinstance::determineGroup(std::string &user, int &rfg, ListContainer &uglc)
+int ipinstance::determineGroup(std::string &user, int &rfg, StoryBoard &story, NaughtyFilter &cm)
 {
     struct in_addr sin;
     inet_aton(user.c_str(), &sin);
@@ -238,6 +245,11 @@ int ipinstance::determineGroup(std::string &user, int &rfg, ListContainer &uglc)
     fg = inList(addr);
     if (fg >= 0) {
         rfg = fg;
+        cm.filtergroup = rfg;
+        if (cm.authrec != nullptr) {
+            cm.authrec->group_source = "ip";
+            cm.authrec->filter_group = rfg;
+        }
 #ifdef E2DEBUG
         std::cerr << thread_id << "Matched IP " << user << " to straight IP list" << std::endl;
 #endif
@@ -246,6 +258,11 @@ int ipinstance::determineGroup(std::string &user, int &rfg, ListContainer &uglc)
     fg = inSubnet(addr);
     if (fg >= 0) {
         rfg = fg;
+        cm.filtergroup = rfg;
+        if (cm.authrec != nullptr) {
+            cm.authrec->group_source = "ip";
+            cm.authrec->filter_group = rfg;
+        }
 #ifdef E2DEBUG
         std::cerr << thread_id << "Matched IP " << user << " to subnet" << std::endl;
 #endif
@@ -254,6 +271,11 @@ int ipinstance::determineGroup(std::string &user, int &rfg, ListContainer &uglc)
     fg = inRange(addr);
     if (fg >= 0) {
         rfg = fg;
+        cm.filtergroup = rfg;
+        if (cm.authrec != nullptr) {
+            cm.authrec->group_source = "ip";
+            cm.authrec->filter_group = rfg;
+        }
 #ifdef E2DEBUG
         std::cerr << thread_id << "Matched IP " << user << " to range" << std::endl;
 #endif
@@ -262,6 +284,7 @@ int ipinstance::determineGroup(std::string &user, int &rfg, ListContainer &uglc)
 #ifdef E2DEBUG
     std::cerr << thread_id << "Matched IP " << user << " to nothing" << std::endl;
 #endif
+    (void)story;
     return E2AUTH_NOMATCH;
 }
 //
@@ -297,7 +320,7 @@ int ipinstance::searchList(int a, int s, const uint32_t &ip)
 // search subnet list for given IP & return filter group or -1
 int ipinstance::inSubnet(const uint32_t &ip)
 {
-    for (std::list<subnetstruct>::const_iterator i = ipsubnetlist.begin(); i != ipsubnetlist.end(); ++i) {
+    for (std::list<ip_subnet_entry>::const_iterator i = ipsubnetlist.begin(); i != ipsubnetlist.end(); ++i) {
         if (i->maskedaddr == (ip & i->mask)) {
             return i->group;
         }
@@ -308,7 +331,7 @@ int ipinstance::inSubnet(const uint32_t &ip)
 // search range list for a range containing given IP & return filter group or -1
 int ipinstance::inRange(const uint32_t &ip)
 {
-    for (std::list<rangestruct>::const_iterator i = iprangelist.begin(); i != iprangelist.end(); ++i) {
+    for (std::list<ip_range_entry>::const_iterator i = iprangelist.begin(); i != iprangelist.end(); ++i) {
         if ((ip >= i->startaddr) && (ip <= i->endaddr)) {
             return i->group;
         }
@@ -395,7 +418,7 @@ int ipinstance::readIPMelangeList(const char *filename)
             String subnet(key.before("/"));
             String mask(key.after("/"));
             if (inet_aton(subnet.toCharArray(), &address) && inet_aton(mask.toCharArray(), &addressmask)) {
-                subnetstruct s;
+                ip_subnet_entry s;
                 int addr = ntohl(address.s_addr);
                 s.mask = ntohl(addressmask.s_addr);
                 // pre-mask the address for quick comparison
@@ -413,7 +436,7 @@ int ipinstance::readIPMelangeList(const char *filename)
             if (host_part > -1) {
                 String mask = (0xFFFFFFFF << host_part);
                 if (inet_aton(subnet.toCharArray(), &address) && inet_aton(mask.toCharArray(), &addressmask)) {
-                    subnetstruct s;
+                    ip_subnet_entry s;
                     uint32_t addr = ntohl(address.s_addr);
                     s.mask = ntohl(addressmask.s_addr);
                     // pre-mask the address for quick comparison
@@ -428,7 +451,7 @@ int ipinstance::readIPMelangeList(const char *filename)
             String start(key.before("-"));
             String end(key.after("-"));
             if (inet_aton(start.toCharArray(), &addressstart) && inet_aton(end.toCharArray(), &addressend)) {
-                rangestruct r;
+                ip_range_entry r;
                 r.startaddr = ntohl(addressstart.s_addr);
                 r.endaddr = ntohl(addressend.s_addr);
                 r.group = value.toInteger() - 1;
@@ -457,13 +480,13 @@ int ipinstance::readIPMelangeList(const char *filename)
         ++i;
     }
     std::cerr << thread_id << "subnet list dump:" << std::endl;
-    std::list<subnetstruct>::const_iterator j = ipsubnetlist.begin();
+    std::list<ip_subnet_entry>::const_iterator j = ipsubnetlist.begin();
     while (j != ipsubnetlist.end()) {
         std::cerr << thread_id << "Masked IP: " << j->maskedaddr << " Mask: " << j->mask << " Group: " << j->group << std::endl;
         ++j;
     }
     std::cerr << thread_id << "range list dump:" << std::endl;
-    std::list<rangestruct>::const_iterator k = iprangelist.begin();
+    std::list<ip_range_entry>::const_iterator k = iprangelist.begin();
     while (k != iprangelist.end()) {
         std::cerr << thread_id << "Start IP: " << k->startaddr << " End IP: " << k->endaddr << " Group: " << k->group << std::endl;
         ++k;
