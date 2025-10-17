@@ -1,5 +1,4 @@
 // IP (range, subnet) auth plugin
-
 // For all support, instructions and copyright go to:
 // http://e2guardian.org/
 // Released under the GPL v2, with the OpenSSL exception described in the README file.
@@ -15,9 +14,11 @@
 
 #include <syslog.h>
 #include <algorithm>
-#include <unistd.h>
-#include <iostream>
 #include <fstream>
+#include <iostream>
+#include <sstream>
+#include <unistd.h>
+#include <vector>
 
 // GLOBALS
 
@@ -42,7 +43,6 @@ extern thread_local std::string thread_id;
 
 // class for linking IPs to filter groups, complete with comparison operators
 // allowing standard C++ sort to work
-#ifdef NODEF
 class ip
 {
     public:
@@ -66,7 +66,6 @@ class ip
         return a == addr;
     };
 };
-#endif
 
 // class name is relevant!
 class ipinstance : public AuthPlugin
@@ -89,7 +88,7 @@ class ipinstance : public AuthPlugin
     int quit();
 
     private:
-    //std::vector<ip> iplist;
+    std::vector<ip> iplist;
     std::list<subnetstruct> ipsubnetlist;
     std::list<rangestruct> iprangelist;
 
@@ -120,9 +119,9 @@ AuthPlugin *ipcreate(ConfigVar &definition)
 // plugin quit - clear IP, subnet & range lists
 int ipinstance::quit()
 {
-    //iplist.clear();
-    //ipsubnetlist.clear();
-    //iprangelist.clear();
+    iplist.clear();
+    ipsubnetlist.clear();
+    iprangelist.clear();
     return 0;
 }
 
@@ -135,14 +134,55 @@ int ipinstance::init(void *args)
         sen.entry_id = ENT_STORYA_AUTH_IP;
         story_entry = sen.entry_id;
         o.auth_entry_dq.push_back(sen);
-	read_def_fg();
-        return 0;
     } else {
         if (!is_daemonised)
             std::cerr << thread_id << "No story_function defined in IP auth plugin config" << std::endl;
         syslog(LOG_ERR, "No story_function defined in IP auth plugin config");
         return -1;
     }
+
+    std::string ipgroups_path;
+    String fname(cv["ipgroups"]);
+    if (fname.length() > 0) {
+        ipgroups_path = fname.toCharArray();
+    } else {
+        for (const auto &entry : o.ipmaplist_dq) {
+            std::string token;
+            std::string name;
+            std::string path;
+            std::stringstream ss(entry.toCharArray());
+            while (std::getline(ss, token, ',')) {
+                std::string::size_type start = token.find_first_not_of(" \t");
+                if (start == std::string::npos)
+                    continue;
+                std::string::size_type end = token.find_last_not_of(" \t");
+                std::string trimmed = token.substr(start, end - start + 1);
+                if (trimmed.rfind("name=", 0) == 0) {
+                    name = trimmed.substr(5);
+                } else if (trimmed.rfind("path=", 0) == 0) {
+                    path = trimmed.substr(5);
+                }
+            }
+            if (!name.empty() && name == "ipmap" && !path.empty()) {
+                ipgroups_path = path;
+                break;
+            }
+        }
+    }
+
+    if (ipgroups_path.empty()) {
+        if (!is_daemonised)
+            std::cerr << thread_id << "No ipgroups file defined for IP auth plugin" << std::endl;
+        syslog(LOG_ERR, "No ipgroups file defined for IP auth plugin");
+        return -1;
+    }
+
+    int read_result = readIPMelangeList(ipgroups_path.c_str());
+    if (read_result < 0)
+        return read_result;
+
+    read_def_fg();
+    return read_result;
 }
 
 // IP-based filter group determination
@@ -183,12 +223,11 @@ int ipinstance::identify(Socket &peercon, Socket &proxycon, HTTPHeader &h, std::
     	    string = peercon.getPeerIP();
     }
     authrec.user_name = string;
-    authrec.user_source = "ip";;
-    is_real_user = false;
+    authrec.user_source = "ip";
+    is_real_user = true;
     return E2AUTH_OK;
 }
 
-#ifdef NODEF
 int ipinstance::determineGroup(std::string &user, int &rfg, ListContainer &uglc)
 {
     struct in_addr sin;
@@ -196,7 +235,7 @@ int ipinstance::determineGroup(std::string &user, int &rfg, ListContainer &uglc)
     uint32_t addr = ntohl(sin.s_addr);
     int fg;
     // check straight IPs, subnets, and ranges
-//    fg = inList(addr);
+    fg = inList(addr);
     if (fg >= 0) {
         rfg = fg;
 #ifdef E2DEBUG
@@ -204,7 +243,7 @@ int ipinstance::determineGroup(std::string &user, int &rfg, ListContainer &uglc)
 #endif
         return E2AUTH_OK;
     }
-//    fg = inSubnet(addr);
+    fg = inSubnet(addr);
     if (fg >= 0) {
         rfg = fg;
 #ifdef E2DEBUG
@@ -212,7 +251,7 @@ int ipinstance::determineGroup(std::string &user, int &rfg, ListContainer &uglc)
 #endif
         return E2AUTH_OK;
     }
-//    fg = inRange(addr);
+    fg = inRange(addr);
     if (fg >= 0) {
         rfg = fg;
 #ifdef E2DEBUG
@@ -225,10 +264,6 @@ int ipinstance::determineGroup(std::string &user, int &rfg, ListContainer &uglc)
 #endif
     return E2AUTH_NOMATCH;
 }
-
-#endif
-
-#ifdef NODEF
 //
 //
 // IP list functions (straight match, range match, subnet match)
@@ -239,7 +274,7 @@ int ipinstance::determineGroup(std::string &user, int &rfg, ListContainer &uglc)
 int ipinstance::inList(const uint32_t &ip)
 {
     if (iplist.size() > 0) {
-        return searchList(0, iplist.size(), ip);
+        return searchList(0, static_cast<int>(iplist.size()) - 1, ip);
     }
     return -1;
 }
@@ -280,9 +315,6 @@ int ipinstance::inRange(const uint32_t &ip)
     }
     return -1;
 }
-#endif // NODEF
-
-#ifdef NODEF
 // read in a list linking IPs, subnets & IP ranges to filter groups
 // return 0 for success, -1 for failure, 1 for warning
 int ipinstance::readIPMelangeList(const char *filename)
@@ -440,4 +472,3 @@ int ipinstance::readIPMelangeList(const char *filename)
     // return either warning or success
     return warn ? 1 : 0;
 }
-#endif // NODEF
