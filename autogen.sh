@@ -73,16 +73,18 @@ ensure_autom4te_wrapper() {
 
         local need_wrapper=0
         for version in $versions; do
-                if command -v "autom4te-$version" >/dev/null 2>&1; then
-                        continue
-                fi
-                need_wrapper=1
-                local wrapper="$helper_dir/autom4te-$version"
-                cat <<EOF_WRAPPER >"$wrapper"
+                for wrapper_name in "autom4te-$version" "autom4te$version"; do
+                        if command -v "$wrapper_name" >/dev/null 2>&1; then
+                                continue
+                        fi
+                        need_wrapper=1
+                        local wrapper="$helper_dir/$wrapper_name"
+                        cat <<EOF_WRAPPER >"$wrapper"
 #!/bin/sh
 exec "$fallback_path" "\$@"
 EOF_WRAPPER
-                chmod +x "$wrapper"
+                        chmod +x "$wrapper"
+                done
         done
 
         if [ "$need_wrapper" -eq 1 ]; then
