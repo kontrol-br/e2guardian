@@ -146,10 +146,10 @@ class ListContainer
     char *findEndsWith(const char *string, String &lastcategory);
     char *findStartsWith(const char *string, String &lastcategory);
     char *findStartsWithPartial(const char *string, String &lastcategory);
-    String searchIPMap(int a, int s, const uint32_t &ip);
-    String searchDataMap(int a, int s, const String  &key);
-    String inSubnetMap(const uint32_t &ip);
-    String inIPRangeMap(const uint32_t &ip);
+    const String *searchIPMap(int a, int s, const uint32_t &ip);
+    const String *searchDataMap(int a, int s, const String &key);
+    const String *inSubnetMap(const uint32_t &ip);
+    const String *inIPRangeMap(const uint32_t &ip);
 
     int getListLength()
     {
@@ -272,10 +272,10 @@ class ListContainer
     bool readTimeBand(String &tag, TimeLimit &tl);
     int getCategoryIndex(String *lcat);
     const char *inIPList(const std::string &ipstr );
-    String getIPMapData(std::string &ip);
+    const String *getIPMapData(std::string &ip);
     const char *hIPtoChar(uint32_t ip);
-    String inIPMap(const uint32_t &ip);
-    String getMapData(String &key);
+    const String *inIPMap(const uint32_t &ip);
+    const String *getMapData(String &key);
 };
 
 #endif

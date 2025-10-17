@@ -17,6 +17,7 @@
 #include "RegExp.hpp"
 #include <cstdlib>
 #include <cstdio>
+#include <cstring>
 #include <ctime>
 #include <unistd.h>
 #include <iostream>
@@ -492,80 +493,6 @@ ListContainer::ifsreadItemList(std::istream *input, String basedir, const char *
         if (is_map) {
             std::stable_sort(ipmaplist.begin(), ipmaplist.end());
             issorted = true;
-            // temp code for testing
-            if (false) {
-                std::cerr << "ipmaplist size is " << ipmaplist.size() << std::endl;
-                std::vector<String> iplist2{
-                        "10.81.64.5",
-                        "10.81.76.23",
-                        "10.81.65.12",
-                        "10.81.65.16",
-                        "10.81.65.22",
-                        "10.81.65.25",
-                        "10.81.65.29",
-                        "10.81.65.31",
-                        "10.81.65.33",
-                        "10.81.65.35",
-                        "10.81.65.36",
-                        "10.81.65.37",
-                        "10.81.65.39",
-                        "10.81.65.40",
-                        "10.81.65.41",
-                        "10.81.65.45",
-                        "10.81.65.48",
-                        "10.81.65.49",
-                        "10.81.65.50",
-                        "10.81.65.51",
-                        "10.81.65.52",
-                        "10.81.65.55",
-                        "10.81.65.56",
-                        "10.81.65.57",
-                        "10.81.65.58",
-                        "10.81.65.59",
-                        "10.81.65.63",
-                        "10.81.65.60",
-                        "10.81.65.93",
-                        "10.81.65.159",
-                        "10.81.66.13",
-                        "10.81.66.18",
-                        "10.81.66.20",
-                        "10.81.66.25",
-                        "10.81.66.26",
-                        "10.81.66.28",
-                        "10.81.66.34",
-                        "10.81.66.36",
-                        "10.81.66.37",
-                        "10.81.66.39",
-                        "10.81.66.40",
-                        "10.81.66.42",
-                        "10.81.66.43",
-                        "10.81.66.44",
-                        "10.81.66.47",
-                        "10.81.66.51",
-                        "10.81.66.58",
-                        "10.81.66.64",
-                        "10.81.66.75",
-                        "10.81.67.10",
-                        "10.81.67.11",
-                        "10.81.67.12",
-                        "10.81.69.10",
-                        "10.81.70.13",
-                        "10.81.70.14",
-                        "192.168.206.27",
-                        "192.168.206.30",
-                        "192.168.206.35",
-                        "192.168.206.36",
-                };
-                for (auto item: iplist2) {
-                    String res = getIPMapData(item);
-                    if (res.empty()) {
-                        std::cerr << "IP " << item << " NOT found" << std::endl;
-                    } else {
-                        std::cerr << "IP " << item << " found group " << res << std::endl;
-                    }
-
-                }
-            }
         } else {
             std::stable_sort(iplist.begin(), iplist.end());
             issorted = true;
@@ -574,15 +501,6 @@ ListContainer::ifsreadItemList(std::istream *input, String basedir, const char *
     } else if (is_map) {
         std::stable_sort(datamaplist.begin(), datamaplist.end());
         issorted = true;
-        if(false) {   // make true for testing
-            for (auto item : datamaplist) {
-                std::cerr << item.key << " mapped to " << item.group << std::endl;
-            }
-            std::cerr << "End of list" << std::endl;
-            String t = "philip";
-            String tg = getMapData(t);
-            std::cerr << "Search for philip got " << tg.c_str() << std::endl;
-        }
     }
     return true; // sucessful read
 }
@@ -771,9 +689,9 @@ const char *ListContainer::findInList(const char *string, String &lastcategory) 
         if (is_iplist) {
             if (is_map) {
                 std::string sstring = string;
-                String rcs = getIPMapData(sstring);
-                if (rcs != "")
-                    return rcs.toCharArray();
+                const String *rcs = getIPMapData(sstring);
+                if (rcs != nullptr)
+                    return rcs->toCharArray();
             } else if (inIPList(string) != NULL) {
                 lastcategory = category;
                 return "";    //TODO return IP/IPblock/IPrange matched
@@ -781,9 +699,9 @@ const char *ListContainer::findInList(const char *string, String &lastcategory) 
         } else if (is_map) {
             String sstring;
             sstring = string;
-            String rcs = getMapData(sstring);
-            if (rcs != "")
-                return rcs.c_str();
+            const String *rcs = getMapData(sstring);
+            if (rcs != nullptr)
+                return rcs->toCharArray();
         } else if (items > 0) {
             int r;
             if (isSW) {
@@ -1779,125 +1697,129 @@ void ListContainer::addToIPMap(String &line) {
 }
 
 // binary search list for given IP & return filter group, or -1 on failure
-String ListContainer::searchIPMap(int a, int s, const uint32_t &ip) {
+const String *ListContainer::searchIPMap(int a, int s, const uint32_t &ip) {
     // change to serial search for testing
     if (false) {
         for (auto item : ipmaplist) {
             if (item.addr == ip) {
-                return item.group;
+                return &(item.group);
             }
         }
-        return "";
+        return nullptr;
     }
 
     if (true) {
         if (a > s)
-            return "";
+            return nullptr;
         int m = (a + s) / 2;
         if (ipmaplist[m].addr == ip)
-            return ipmaplist[m].group;
+            return &(ipmaplist[m].group);
         if (ipmaplist[m].addr < ip)
             return searchIPMap(m + 1, s, ip);
         if (a == s)
-            return "";
+            return nullptr;
         return searchIPMap(a, m - 1, ip);
     }
 }
 
 // search subnet list for given IP & return filter group or -1
-String ListContainer::inSubnetMap(const uint32_t &ip) {
+const String *ListContainer::inSubnetMap(const uint32_t &ip) {
     for (std::list<subnetstruct>::const_iterator i = ipmapsubnetlist.begin(); i != ipmapsubnetlist.end(); ++i) {
         if (i->maskedaddr == (ip & i->mask)) {
-            return i->group;
+            return &(i->group);
         }
     }
-    return "";
+    return nullptr;
 }
 
 // search range list for a range containing given IP & return filter group or -1
-String ListContainer::inIPRangeMap(const uint32_t &ip) {
+const String *ListContainer::inIPRangeMap(const uint32_t &ip) {
     for (std::list<rangestruct>::const_iterator i = ipmaprangelist.begin(); i != ipmaprangelist.end(); ++i) {
         if ((ip >= i->startaddr) && (ip <= i->endaddr)) {
-            return i->group;
+            return &(i->group);
         }
     }
-    return "";
+    return nullptr;
 }
 
-String ListContainer::inIPMap(const uint32_t &ip) {
+const String *ListContainer::inIPMap(const uint32_t &ip) {
     if (ipmaplist.size() > 0) {
         return searchIPMap(0, ipmaplist.size() - 1, ip);
     }
-    return "";
+    return nullptr;
 }
 
 // binary search list for given key & return filter group, or -1 on failure
-String ListContainer::searchDataMap(int a, int s, const String  &key) {
+const String *ListContainer::searchDataMap(int a, int s, const String &key) {
     // change to serial search for testing
     if (false) {
         for (auto item : datamaplist) {
-            if (item.key== key) {
-                return item.group;
+            if (item.key == key) {
+                return &(item.group);
             }
         }
-        return "";
+        return nullptr;
     }
 
     if (true) {
         if (a > s)
-            return "";
+            return nullptr;
         int m = (a + s) / 2;
         if (datamaplist[m].key == key)
-            return datamaplist[m].group;
+            return &(datamaplist[m].group);
         if (datamaplist[m].key < key)
             return searchDataMap(m + 1, s, key);
         if (a == s)
-            return "";
+            return nullptr;
         return searchDataMap(a, m - 1, key);
     }
 }
 
-String ListContainer::getMapData(String &key) {
-    if(datamaplist.empty())
-        return "";
-    return  searchDataMap(0,datamaplist.size() - 1,key);
+const String *ListContainer::getMapData(String &key) {
+    if (datamaplist.empty())
+        return nullptr;
+    return searchDataMap(0, datamaplist.size() - 1, key);
 }
 
-String ListContainer::getIPMapData(std::string &ip) {
+const String *ListContainer::getIPMapData(std::string &ip) {
+    String ipvalue(ip.c_str());
+    ipvalue.removeWhiteSpace();
     struct in_addr sin;
-    inet_aton(ip.c_str(), &sin);
+    memset(&sin, 0, sizeof(sin));
+    if (inet_aton(ipvalue.toCharArray(), &sin) == 0) {
+#ifdef E2DEBUG
+        std::cerr << thread_id << "Invalid IP string \"" << ip << "\" when searching IP map" << std::endl;
+#endif
+        return nullptr;
+    }
     uint32_t addr = ntohl(sin.s_addr);
-    String fgs;
-    String rfg;
+    const String *fgs;
     // check straight IPs, subnets, and ranges
     fgs = inIPMap(addr);
-    if (fgs != "") {
-        rfg = fgs;
+    if (fgs != nullptr) {
 #ifdef E2DEBUG
         std::cerr << thread_id << "Matched IP " << ip << " to straight IP list" << std::endl;
 #endif
-        return rfg;
+        return fgs;
     }
     fgs = inSubnetMap(addr);
-    if (fgs != "") {
-        rfg = fgs;
+    if (fgs != nullptr) {
 #ifdef E2DEBUG
         std::cerr << thread_id << "Matched IP " << ip << " to subnet" << std::endl;
 #endif
-        return rfg;
+        return fgs;
     }
     fgs = inIPRangeMap(addr);
-    if (fgs != "") {
-        rfg = fgs;
+    if (fgs != nullptr) {
 #ifdef E2DEBUG
         std::cerr << thread_id << "Matched IP " << ip << " to range" << std::endl;
 #endif
-        return rfg;
+        return fgs;
     }
 #ifdef E2DEBUG
     std::cerr << thread_id << "Matched IP " << ip << " to nothing" << std::endl;
 #endif
-    return "";
+    return nullptr;
 }
 
 
@@ -2262,7 +2184,15 @@ String ListContainer::getListCategoryAtD(unsigned int index) {
 // search for IP in list of individual IPs, ranges, subnets
 const char *ListContainer::inIPList(const std::string &ipstr) {
     struct in_addr addr;
-    inet_aton(ipstr.c_str(), &addr);
+    memset(&addr, 0, sizeof(addr));
+    String ipvalue(ipstr.c_str());
+    ipvalue.removeWhiteSpace();
+    if (inet_aton(ipvalue.toCharArray(), &addr) == 0) {
+#ifdef E2DEBUG
+        std::cerr << thread_id << "inIPList received invalid IP string \"" << ipstr << "\"" << std::endl;
+#endif
+        return NULL;
+    }
     uint32_t ip = ntohl(addr.s_addr);
     // start with individual IPs
     if ((iplist.size() > 0) && std::binary_search(iplist.begin(), iplist.end(), ip)) {
