@@ -655,7 +655,7 @@ AC_FINALIZE_VAR(E2CONFFILE,"${e2sysconfdir}/${PACKAGE_NAME}.conf")
 AC_SUBST(E2CONFFILE)
 #AC_DEFINE_UNQUOTED(__CONFDIR,"${e2sysconfdir}","")
 AC_DEFINE_UNQUOTED([__DATADIR],["${E2DATADIR}"],["Data directory path"])
-AC_DEFINE_UNQUOTED(__CONFFILE,"${e2sysconfdir}/${PACKAGE_NAME}.conf","Configure file path")
+AC_DEFINE_UNQUOTED(__CONFFILE,"${E2CONFFILE}","Configure file path")
 
 AC_CONFIG_FILES([Makefile
 data/Makefile
