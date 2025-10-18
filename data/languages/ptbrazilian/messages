@@ -44,7 +44,7 @@
 "204"," - Por favor, tente novamente mais tarde"
 "205","O proxy adjacente não está respondendo (Erro de rede)"
 "206"," - Por favor, tente novamente mais tarde"
-"207","O site acessado não exsite"
+"207","O site acessado não existe"
 "208","O site acessado não possuo um endereço IPV4 válido"
 "209","Erro de DNS temporário - Tente novamente mais tarde"
 "210","Falha no serviço DNS - Tente novamente mais tarde"
