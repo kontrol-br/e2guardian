@@ -116,6 +116,36 @@ class ipinstance : public AuthPlugin
 
 namespace
 {
+enum class SpecialIpGroup
+{
+    None,
+    Exception,
+    Banned
+};
+
+constexpr int kHiddenExceptionGroup = -2;
+constexpr int kHiddenBannedGroup = -3;
+
+SpecialIpGroup classify_special_group(String token)
+{
+    token.toLower();
+    token.removeWhiteSpace();
+    token.removePunctuation();
+    token.removeChar('_');
+    token.removeChar('-');
+
+    if (token.length() == 0)
+        return SpecialIpGroup::None;
+
+    if ((token == "exceptioniplist") || (token == "exceptionlist") || (token == "exceptionip"))
+        return SpecialIpGroup::Exception;
+
+    if ((token == "bannediplist") || (token == "bannedlist") || (token == "bannedip"))
+        return SpecialIpGroup::Banned;
+
+    return SpecialIpGroup::None;
+}
+
 int ensure_directories(const std::string &path)
 {
     if (path.empty())
@@ -476,6 +506,12 @@ int ipinstance::inRange(const uint32_t &ip)
 
 int ipinstance::parseFilterGroup(const String &value, const char *filename, const String &line, bool &warn)
 {
+    SpecialIpGroup special = classify_special_group(value);
+    if (special == SpecialIpGroup::Exception)
+        return kHiddenExceptionGroup;
+    if (special == SpecialIpGroup::Banned)
+        return kHiddenBannedGroup;
+
     String normalised(value);
     normalised.toLower();
     normalised.removeWhiteSpace();
@@ -495,8 +531,14 @@ int ipinstance::parseFilterGroup(const String &value, const char *filename, cons
         }
     }
 
-    String numeric = digits.length() > 0 ? digits : normalised;
+    bool has_digits = digits.length() > 0;
+    String numeric = has_digits ? digits : normalised;
     int group = numeric.toInteger();
+    if (has_digits && group == 0) {
+        if (o.filter_groups > 0)
+            return 0;
+        group = -1;
+    }
     if ((group < 1) || (group > o.filter_groups)) {
         if (!is_daemonised)
             std::cerr << thread_id << "Filter group out of range; entry " << line << " in " << filename << std::endl;
@@ -566,6 +608,12 @@ int ipinstance::readIPMelangeList(const char *filename)
             continue;
         }
         int group = parseFilterGroup(value, filename, line, warn);
+        if (group == kHiddenExceptionGroup || group == kHiddenBannedGroup) {
+            if (!is_daemonised)
+                std::cerr << thread_id << "Ignoring special IP list entry " << line << " in " << filename << std::endl;
+            syslog(LOG_INFO, "Ignoring special IP list entry %s in %s", line.toCharArray(), filename);
+            continue;
+        }
         if (group < 0)
             continue;
         // store the IP address (numerically, not as a string) and filter group in either the IP list, subnet list or range list
@@ -590,22 +638,25 @@ int ipinstance::readIPMelangeList(const char *filename)
             }
         } else if (matchCIDR.match(key.toCharArray(),Rre)) {
             struct in_addr address;
-            struct in_addr addressmask;
             String subnet(key.before("/"));
             String cidr(key.after("/"));
             int m = cidr.toInteger();
-            int host_part = 32 - m;
-            if (host_part > -1) {
-                String mask = (0xFFFFFFFF << host_part);
-                if (inet_aton(subnet.toCharArray(), &address) && inet_aton(mask.toCharArray(), &addressmask)) {
-                    ip_subnet_entry s;
-                    uint32_t addr = ntohl(address.s_addr);
-                    s.mask = ntohl(addressmask.s_addr);
-                    // pre-mask the address for quick comparison
-                    s.maskedaddr = addr & s.mask;
-                    s.group = group;
-                    ipsubnetlist.push_back(s);
-                }
+            if (m < 0 || m > 32) {
+                if (!is_daemonised)
+                    std::cerr << thread_id << "Invalid CIDR prefix; entry " << line << " in " << filename << std::endl;
+                syslog(LOG_ERR, "Invalid CIDR prefix; entry %s in %s", line.toCharArray(), filename);
+                warn = true;
+                continue;
+            }
+            if (inet_aton(subnet.toCharArray(), &address)) {
+                uint32_t addr = ntohl(address.s_addr);
+                uint32_t mask = (m == 0) ? 0 : (0xFFFFFFFFu << (32 - m));
+                ip_subnet_entry s;
+                s.mask = mask;
+                // pre-mask the address for quick comparison
+                s.maskedaddr = addr & s.mask;
+                s.group = group;
+                ipsubnetlist.push_back(s);
             }
         } else if (matchRange.match(key.toCharArray(),Rre)) {
             struct in_addr addressstart;
