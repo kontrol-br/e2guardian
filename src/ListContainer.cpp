@@ -20,8 +20,10 @@
 #include <cstring>
 #include <ctime>
 #include <unistd.h>
+#include <cerrno>
 #include <iostream>
 #include <fstream>
+#include <string>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <list>
@@ -42,6 +44,104 @@ extern thread_local std::string thread_id;
 #define ROOTOFFSET ROOTNODESIZE - GRAPHENTRYSIZE
 
 // IMPLEMENTATION
+
+namespace {
+
+bool ensureDirectoryExists(const std::string &path) {
+    if (path.empty()) {
+        return true;
+    }
+
+    struct stat status {};
+    if (stat(path.c_str(), &status) == 0) {
+        return S_ISDIR(status.st_mode);
+    }
+
+    if (errno != ENOENT) {
+        return false;
+    }
+
+    auto slash = path.find_last_of('/');
+    if (slash != std::string::npos) {
+        if (!ensureDirectoryExists(path.substr(0, slash))) {
+            return false;
+        }
+    }
+
+    if (mkdir(path.c_str(), 0750) == 0 || errno == EEXIST) {
+        return true;
+    }
+
+    return false;
+}
+
+bool copyFileContents(const std::string &source, const std::string &destination) {
+    std::ifstream input(source, std::ios::in | std::ios::binary);
+    if (!input.good()) {
+        return false;
+    }
+
+    std::ofstream output(destination, std::ios::out | std::ios::binary | std::ios::trunc);
+    if (!output.good()) {
+        return false;
+    }
+
+    output << input.rdbuf();
+    return output.good();
+}
+
+bool ensureListFileExists(const char *filename) {
+    struct stat status {};
+    if (stat(filename, &status) == 0) {
+        return S_ISREG(status.st_mode);
+    }
+
+    if (errno != ENOENT) {
+        return false;
+    }
+
+    std::string filepath(filename);
+    std::string directory;
+    auto slash = filepath.find_last_of('/');
+    if (slash != std::string::npos) {
+        directory = filepath.substr(0, slash);
+    }
+
+    if (!directory.empty() && !ensureDirectoryExists(directory)) {
+        return false;
+    }
+
+    std::string sample = filepath + ".sample";
+    bool created = false;
+    const char *log_suffix = "";
+    if (stat(sample.c_str(), &status) == 0 && S_ISREG(status.st_mode)) {
+        created = copyFileContents(sample, filepath);
+        log_suffix = " from sample";
+    } else {
+        std::ofstream output(filepath, std::ios::out | std::ios::binary | std::ios::trunc);
+        created = output.good();
+        log_suffix = "";
+    }
+
+    if (!created) {
+        return false;
+    }
+
+    chmod(filepath.c_str(), 0640);
+
+    if (!is_daemonised) {
+        std::cerr << thread_id << "Auto-created missing list file" << log_suffix << ": " << filepath << std::endl;
+    }
+    if (*log_suffix == '\0') {
+        syslog(LOG_WARNING, "Auto-created missing list file: %s", filepath.c_str());
+    } else {
+        syslog(LOG_WARNING, "Auto-created missing list file from sample: %s", filepath.c_str());
+    }
+
+    return true;
+}
+
+} // namespace
 
 
 // Constructor - set default values
@@ -510,6 +610,13 @@ bool ListContainer::ifsReadSortItemList(std::ifstream *input, String basedir, co
                                         const char *endstring, bool do_includes, bool startswith, int filters,
                                         const char *filename) {
     size_t len = 0;
+    if (!ensureListFileExists(filename)) {
+        if (!is_daemonised) {
+            std::cerr << thread_id << "Unable to create missing list file: " << filename << std::endl;
+        }
+        syslog(LOG_ERR, "Unable to create missing list file: %s", filename);
+        return false;
+    }
     try {
         len = getFileLength(filename);
     } catch (std::runtime_error &e) {
@@ -552,8 +659,15 @@ bool ListContainer::readItemList(const char *filename, const char *list_pwd, boo
     std::cerr << thread_id << filename << std::endl;
 #endif
     //struct stat s;
-    filedate = getFileDate(filename);
     size_t len = 0;
+    if (!ensureListFileExists(filename)) {
+        if (!is_daemonised) {
+            std::cerr << thread_id << "Unable to create missing list file: " << filename << std::endl;
+        }
+        syslog(LOG_ERR, "Unable to create missing list file: %s", filename);
+        return false;
+    }
+    filedate = getFileDate(filename);
     try {
         len = getFileLength(filename);
     } catch (std::runtime_error &e) {
