@@ -44,5 +44,56 @@ Ideas for the future
 A commonly requested feature in DansGuardian is LDAP integration for retrieving group mappings. This feature is present in SmoothGuardian, SmoothWall Limited's commercially-supported version, but relies upon integration with an external, proprietary authentication daemon. One elegant way of implementing this for the GPL release would be to create an authentication "meta-plugin": one that implemented an LDAP-capable determineGroup() method, but that was capable of containing instances of other plugins to make use of their identify() methods. That way, LDAP integration would "just work" for all existing plugins. This is left as an exercise for the reader.
 
 
+DNS authentication plugin
+=========================
+
+The DNS authentication plugin (`dnsauth`) allows an external process to publish
+user and group assignments as DNS TXT records. When enabled, the plugin takes
+the source IP address (and, if `usexforwardedfor` is active, the original
+client IP) and replaces every `.` with `-` to form the *IP path*. The plugin
+then performs a TXT lookup on:
+
+```
+<ip-path>.<basedomain>
+```
+
+The returned TXT record must contain a string formatted as `username,groupid`,
+where `groupid` is the 1-based filter group number (for example, `2` selects
+`e2guardianf2.conf`). If no record exists, the plugin either falls through to
+the next authentication mechanism or, when `redirect_to_auth = yes`, redirects
+the client to the configured portal.
+
+Configuration takes place in `authplugins/dnsauth.conf`:
+
+- `basedomain` — The DNS zone that stores the TXT records. This value is
+  required; the plugin will refuse to start without it.
+- `authurl` — The login page that unauthenticated users should be redirected
+  to. e2guardian appends the encoded original URL to this address.
+- `prefix_auth` — The URL prefix served by the login portal. Requests hitting
+  this prefix (or appearing in the auth bypass lists) are allowed to proceed
+  without redirection so that users can log in.
+- `redirect_to_auth` — When set to `yes` (the default), any request without a
+  matching TXT record triggers a redirect to the login portal. Set to `no` if
+  you prefer the plugin to fall back to the next configured auth plugin.
+
+An example BIND zone excerpt for a LAN with the IP `192.168.1.10` and base
+domain `auth.example.internal` looks like this:
+
+```
+; /etc/namedb/master/auth.example.internal
+@   IN SOA authns.example.internal. hostmaster.example.internal. (
+        2024101801 3600 900 1209600 3600 )
+    IN NS  authns.example.internal.
+
+192-168-1-10    IN TXT "alice,2"
+
+```
+
+With this configuration the client at `192.168.1.10` is identified as `alice`
+and placed into filter group 2. Ensure that your DNS server allows e2guardian
+to resolve these records (for example by forwarding the zone or providing a
+view that exposes the `auth.example.internal` zone to the proxy).
+
+
 --
-Phil A. philip.allison/smoothwall.net 
+Phil A. philip.allison/smoothwall.net
