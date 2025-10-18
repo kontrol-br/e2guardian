@@ -171,6 +171,35 @@ std::string ConnectionHandler::miniURLEncode(const char *s) {
     return encoded;
 }
 
+namespace {
+
+void buildConnectDenyResponse(String &eheader, String &ebody, NaughtyFilter *checkme)
+{
+    String reason(checkme->whatIsNaughtyLog.length() > 0 ? checkme->whatIsNaughtyLog.c_str()
+                                                       : checkme->whatIsNaughty.c_str());
+    if (reason.empty()) {
+        reason = o.language_list.getTranslation(1);
+    }
+
+    ebody = "<HTML><HEAD><TITLE>";
+    ebody += o.language_list.getTranslation(1);
+    ebody += "</TITLE></HEAD><BODY><CENTER><H1>";
+    ebody += o.language_list.getTranslation(1);
+    ebody += "</H1><P>";
+    ebody += reason;
+    ebody += "</P></CENTER></BODY></HTML>\r\n";
+
+    eheader = "HTTP/1.1 403 Forbidden\r\n";
+    eheader += "Server: e2guardian\r\n";
+    eheader += "Content-Type: text/html\r\n";
+    eheader += "Connection: close\r\n";
+    eheader += "Content-Length: ";
+    eheader += std::to_string(ebody.size());
+    eheader += "\r\n\r\n";
+}
+
+}
+
 // create a temporary bypass URL for the banned page
 String ConnectionHandler::hashedURL(String *url, int filtergroup, std::string *clientip,
                                     bool infectionbypass, std::string *user) {
@@ -1894,21 +1923,14 @@ bool ConnectionHandler::genDenyAccess(Socket &peerconn, String &eheader, String 
 
 
 #ifdef __SSLMITM
-            if ((*header).requestType().startsWith("CONNECT") && !(peerconn).isSsl())
+            bool is_connect_request = (*header).requestType().startsWith("CONNECT") && !(peerconn).isSsl();
 #else
-            if ((*header).requestType().startsWith("CONNECT"))
+            bool is_connect_request = (*header).requestType().startsWith("CONNECT");
 #endif
-            {
-        // Block ssl website
-        // Buggy with FF < 65 https://bugzilla.mozilla.org/show_bug.cgi?id=1522093
-	// Connections still opened after a refresh
-	// 403 requests made ICAP error with high load
-		eheader = "HTTP/1.1 302 Redirect";
-		eheader += "\r\nLocation: http://internal.test.e2guardian.org";
-		eheader += "\r\nServer: e2guardian";
-		eheader += "\r\nConnection: close";
-		eheader += "\r\n\r\n";
-	    } else {
+
+            if (is_connect_request) {
+                buildConnectDenyResponse(eheader, ebody, checkme);
+            } else {
                 // we're dealing with a non-SSL'ed request, and have the option of using the custom banned image/page directly
                 bool replaceimage = false;
                 bool replaceflash = false;
@@ -2057,107 +2079,104 @@ bool ConnectionHandler::genDenyAccess(Socket &peerconn, String &eheader, String 
             }
 
 #ifdef __SSLMITM
-            if ((*header).requestType().startsWith("CONNECT") && !(peerconn).isSsl())
+            bool is_connect_request = (*header).requestType().startsWith("CONNECT") && !(peerconn).isSsl();
 #else
-            if ((*header).requestType().startsWith("CONNECT"))
+            bool is_connect_request = (*header).requestType().startsWith("CONNECT");
 #endif
-		{
-        // Block ssl website
-        // Buggy with FF < 65 https://bugzilla.mozilla.org/show_bug.cgi?id=1522093
-	// Connections still opened after a refresh
-	// 403 requests made ICAP error with high load
-		eheader = "HTTP/1.1 302 Redirect";
-		eheader += "\r\nLocation: http://internal.test.e2guardian.org";
-		eheader += "\r\nServer: e2guardian";
-		eheader += "\r\nConnection: close";
-		eheader += "\r\n\r\n";
-                // we're dealing with a non-SSL'ed request, and have the option of using the custom banned image/page directly
-	    } else {
-	    	eheader = "HTTP/1.1 302 Redirect\r\n";
-            	eheader += "Location: ";
-           	eheader += ldl->fg[filtergroup]->access_denied_address;
-	    }
-            if (ldl->fg[filtergroup]->non_standard_delimiter) {
-                eheader += "?DENIEDURL==";
-                eheader += miniURLEncode((*url).toCharArray()).c_str();
-                eheader += "::IP==";
-                eheader += (*clientip).c_str();
-                eheader += "::USER==";
-                eheader += (*clientuser).c_str();
-                eheader += "::FILTERGROUP==";
-                eheader += ldl->fg[filtergroup]->name;
-                if (checkme->clienthost != "") {
-                    eheader += "::HOST==";
-                    eheader += checkme->clienthost.c_str();
-                }
-                eheader += "::CATEGORIES==";
-                eheader += miniURLEncode(cats.c_str()).c_str();
-                if (virushash || filterhash) {
-                    // output either a genuine hash, or just flags
-                    if (dohash) {
-                        eheader += "::";
-                        eheader += hashed.before("=").toCharArray();
-                        eheader += "==";
-                        eheader += hashed.after("=").toCharArray();
-                    } else {
-                        eheader += "::HASH==";
-                        eheader += hashed.toCharArray();
-                    }
-                    if(ldl->fg[filtergroup]->cgi_bypass_v2) {
-                        String data = *clientip;
-                        data += *clientuser;
-                        data += ldl->fg[filtergroup]->cgi_magic;
-                        String checkh(url->md5(data.c_str()));
-                        eheader += "::CHECK==";
-                        eheader += checkh.toCharArray();
-                    }
-                }
-                eheader += "::EXTFLAGS==";
-                eheader += flags.toCharArray();
-                eheader += "::REASON==";
+            if (is_connect_request) {
+                buildConnectDenyResponse(eheader, ebody, checkme);
             } else {
-                eheader += "?DENIEDURL=";
-                eheader += miniURLEncode((*url).toCharArray()).c_str();
-                eheader += "&IP=";
-                eheader += (*clientip).c_str();
-                eheader += "&USER=";
-                eheader += (*clientuser).c_str();
-                eheader += "&FILTERGROUP=";
-                eheader += ldl->fg[filtergroup]->name;
-                if (checkme->clienthost != "") {
-                    eheader += "&HOST=";
-                    eheader += checkme->clienthost.c_str();
-                }
-                eheader += "&CATEGORIES=";
-                eheader += miniURLEncode(cats.c_str()).c_str();
-                if (virushash || filterhash) {
-                    // output either a genuine hash, or just flags
-                    if (dohash) {
-                        eheader += "&";
-                        eheader += hashed.toCharArray();
-                    } else {
-                        eheader += "&HASH=";
-                        eheader += hashed.toCharArray();
+                eheader = "HTTP/1.1 302 Redirect\r\n";
+                eheader += "Location: ";
+                eheader += ldl->fg[filtergroup]->access_denied_address;
+                if (ldl->fg[filtergroup]->non_standard_delimiter) {
+                    eheader += "?DENIEDURL==";
+                    eheader += miniURLEncode((*url).toCharArray()).c_str();
+                    eheader += "::IP==";
+                    eheader += (*clientip).c_str();
+                    eheader += "::USER==";
+                    eheader += (*clientuser).c_str();
+                    eheader += "::FILTERGROUP==";
+                    eheader += ldl->fg[filtergroup]->name;
+                    if (checkme->clienthost != "") {
+                        eheader += "::HOST==";
+                        eheader += checkme->clienthost.c_str();
                     }
-                    if(ldl->fg[filtergroup]->cgi_bypass_v2) {
-                        String data = *clientip;
-                        data += *clientuser;
-                        data += ldl->fg[filtergroup]->cgi_magic;
-                        String checkh(url->md5(data.c_str()));
-                        eheader += "&CHECK=";
-                        eheader += checkh.toCharArray();
+                    eheader += "::CATEGORIES==";
+                    eheader += miniURLEncode(cats.c_str()).c_str();
+                    if (virushash || filterhash) {
+                        // output either a genuine hash, or just flags
+                        if (dohash) {
+                            eheader += "::";
+                            eheader += hashed.before("=").toCharArray();
+                            eheader += "==";
+                            eheader += hashed.after("=").toCharArray();
+                        } else {
+                            eheader += "::HASH==";
+                            eheader += hashed.toCharArray();
+                        }
+                        if(ldl->fg[filtergroup]->cgi_bypass_v2) {
+                            String data = *clientip;
+                            data += *clientuser;
+                            data += ldl->fg[filtergroup]->cgi_magic;
+                            String checkh(url->md5(data.c_str()));
+                            eheader += "::CHECK==";
+                            eheader += checkh.toCharArray();
+                        }
                     }
+                    eheader += "::EXTFLAGS==";
+                    eheader += flags.toCharArray();
+                    eheader += "::REASON==";
+                } else {
+                    eheader += "?DENIEDURL=";
+                    eheader += miniURLEncode((*url).toCharArray()).c_str();
+                    eheader += "&IP=";
+                    eheader += (*clientip).c_str();
+                    eheader += "&USER=";
+                    eheader += (*clientuser).c_str();
+                    eheader += "&FILTERGROUP=";
+                    eheader += ldl->fg[filtergroup]->name;
+                    if (checkme->clienthost != "") {
+                        eheader += "&HOST=";
+                        eheader += checkme->clienthost.c_str();
+                    }
+                    eheader += "&CATEGORIES=";
+                    eheader += miniURLEncode(cats.c_str()).c_str();
+                    if (virushash || filterhash) {
+                        // output either a genuine hash, or just flags
+                        if (dohash) {
+                            eheader += "&";
+                            eheader += hashed.toCharArray();
+                        } else {
+                            eheader += "&HASH=";
+                            eheader += hashed.toCharArray();
+                        }
+                        if(ldl->fg[filtergroup]->cgi_bypass_v2) {
+                            String data = *clientip;
+                            data += *clientuser;
+                            data += ldl->fg[filtergroup]->cgi_magic;
+                            String checkh(url->md5(data.c_str()));
+                            eheader += "&CHECK=";
+                            eheader += checkh.toCharArray();
+                        }
+                    }
+                    eheader += "&EXTFLAGS=";
+                    eheader += flags.toCharArray();
+                    eheader += "&REASON=";
                 }
-                eheader += "&EXTFLAGS=";
-                eheader += flags.toCharArray();
-                eheader += "&REASON=";
+                if (reporting_level == 1) {
+                    eheader += miniURLEncode((*checkme).whatIsNaughty.c_str()).c_str();
+                } else {
+                    eheader += miniURLEncode((*checkme).whatIsNaughtyLog.c_str()).c_str();
+                }
+                eheader += "\r\n\r\n";
             }
-            if (reporting_level == 1) {
-                eheader += miniURLEncode((*checkme).whatIsNaughty.c_str()).c_str();
-            } else {
-                eheader += miniURLEncode((*checkme).whatIsNaughtyLog.c_str()).c_str();
+            if (!is_connect_request) {
+                // ensure final CRLF is present if we didn't already close the header
+                if (!eheader.endsWith("\r\n\r\n")) {
+                    eheader += "\r\n\r\n";
+                }
             }
-            eheader += "\r\n\r\n";
         }
 
             // the user is using the barebones banned page
