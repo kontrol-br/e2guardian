@@ -225,12 +225,19 @@ int ipinstance::init(void *args)
 
     if (ipgroups_path.empty()) {
         std::string default_ipgroups = std::string(__CONFDIR) + "/lists/authplugins/ipgroups";
+        ipgroups_path = default_ipgroups;
+
         if (access(default_ipgroups.c_str(), R_OK) == 0) {
-            ipgroups_path = default_ipgroups;
             if (!is_daemonised)
                 std::cerr << thread_id << "No ipgroups list defined for IP auth plugin, falling back to "
                           << ipgroups_path << std::endl;
             syslog(LOG_INFO, "No ipgroups list defined for IP auth plugin, falling back to %s", ipgroups_path.c_str());
+        } else {
+            if (!is_daemonised)
+                std::cerr << thread_id << "No ipgroups list defined for IP auth plugin, creating default at "
+                          << ipgroups_path << std::endl;
+            syslog(LOG_INFO, "No ipgroups list defined for IP auth plugin, creating default at %s",
+                   ipgroups_path.c_str());
         }
     }
 
