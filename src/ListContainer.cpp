@@ -1648,21 +1648,21 @@ void ListContainer::addToIPList(String &line) {
         }
     } else if (matchCIDR.match(line.toCharArray(), Rre)) {
         struct in_addr address;
-        struct in_addr addressmask;
         String subnet(line.before("/"));
         String cidr(line.after("/"));
         int m = cidr.toInteger();
-        int host_part = 32 - m;
-        if (host_part > -1) {
-            String mask = (0xFFFFFFFF << host_part);
-            if (inet_aton(subnet.toCharArray(), &address) && inet_aton(mask.toCharArray(), &addressmask)) {
-                ipl_subnetstruct s;
-                uint32_t addr = ntohl(address.s_addr);
-                s.mask = ntohl(addressmask.s_addr);
-                // pre-mask the address for quick comparison
-                s.maskedaddr = addr & s.mask;
-                ipsubnetlist.push_back(s);
-            }
+        if (m < 0 || m > 32) {
+            if (!is_daemonised)
+                std::cerr << thread_id << "Invalid CIDR prefix; entry " << line << std::endl;
+            syslog(LOG_ERR, "Invalid CIDR prefix; entry %s", line.toCharArray());
+        } else if (inet_aton(subnet.toCharArray(), &address)) {
+            ipl_subnetstruct s;
+            uint32_t addr = ntohl(address.s_addr);
+            uint32_t mask = (m == 0) ? 0 : (0xFFFFFFFFu << (32 - m));
+            s.mask = mask;
+            // pre-mask the address for quick comparison
+            s.maskedaddr = addr & s.mask;
+            ipsubnetlist.push_back(s);
         }
     } else if (matchRange.match(line.toCharArray(), Rre)) {
         struct in_addr addressstart;
@@ -1809,22 +1809,22 @@ void ListContainer::addToIPMap(String &line) {
     } else if (matchCIDR.match(key.toCharArray(), Rre)) {
 //        std::cerr << "Is CIDR " << key << std::endl;
         struct in_addr address;
-        struct in_addr addressmask;
         String subnet(key.before("/"));
         String cidr(key.after("/"));
         int m = cidr.toInteger();
-        int host_part = 32 - m;
-        if (host_part > -1) {
-            String mask = (0xFFFFFFFF << host_part);
-            if (inet_aton(subnet.toCharArray(), &address) && inet_aton(mask.toCharArray(), &addressmask)) {
-                subnetstruct s;
-                uint32_t addr = ntohl(address.s_addr);
-                s.mask = ntohl(addressmask.s_addr);
-                // pre-mask the address for quick comparison
-                s.maskedaddr = addr & s.mask;
-                s.group = value;
-                ipmapsubnetlist.push_back(s);
-            }
+        if (m < 0 || m > 32) {
+            if (!is_daemonised)
+                std::cerr << thread_id << "Invalid CIDR prefix; entry " << line << " in " << sourcefile << std::endl;
+            syslog(LOG_ERR, "Invalid CIDR prefix; entry %s in %s", line.toCharArray(), sourcefile.c_str());
+        } else if (inet_aton(subnet.toCharArray(), &address)) {
+            subnetstruct s;
+            uint32_t addr = ntohl(address.s_addr);
+            uint32_t mask = (m == 0) ? 0 : (0xFFFFFFFFu << (32 - m));
+            s.mask = mask;
+            // pre-mask the address for quick comparison
+            s.maskedaddr = addr & s.mask;
+            s.group = value;
+            ipmapsubnetlist.push_back(s);
         }
     } else if (matchRange.match(key.toCharArray(), Rre)) {
 //        std::cerr << "Is IP range " << key << std::endl;
