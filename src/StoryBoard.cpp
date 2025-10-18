@@ -276,9 +276,11 @@ bool StoryBoard::readFile(const char *filename, ListMeta &LM, bool is_top) {
                 }
                 }
                 if (!found) {
-                    // warning message
-                    std::cerr << thread_id << "SB warning: Undefined list " << filename << " list " << j->list_name << " used at line " << j->file_lineno
-                              << " of " << i->file_name << std::endl;
+                    if (!j->optional) {
+                        // warning message
+                        std::cerr << thread_id << "SB warning: Undefined list " << filename << " list " << j->list_name << " used at line " << j->file_lineno
+                                  << " of " << i->file_name << std::endl;
+                    }
                 } else {
 #ifdef E2DEBUG
                     std::cerr << j->list_name << " matches " << j->list_id_dq.size() << " types" << std::endl;
