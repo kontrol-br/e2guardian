@@ -25,6 +25,7 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <list>
+#include <cctype>
 
 // GLOBALS
 
@@ -1578,6 +1579,26 @@ void ListContainer::addToDataMap(String &line) {
         key.removeWhiteSpace();
         value = line.after("=");
         value.removeWhiteSpace();
+        String normalised(value);
+        normalised.toLower();
+        if (normalised.startsWith("filter"))
+            normalised = normalised.after("filter");
+        if (normalised.startsWith("group"))
+            normalised = normalised.after("group");
+        normalised.removeWhiteSpace();
+        String digits;
+        const char *ptr = normalised.toCharArray();
+        for (size_t i = 0; ptr[i] != '\0'; ++i) {
+            if (isdigit(static_cast<unsigned char>(ptr[i]))) {
+                digits += ptr[i];
+            } else if (digits.length() > 0) {
+                break;
+            }
+        }
+        if (digits.length() > 0)
+            normalised = digits;
+        value = normalised;
+        value.removeWhiteSpace();
         if (value.startsWith("filter"))
             value = value.after("filter");
     } else {
@@ -1604,6 +1625,26 @@ void ListContainer::addToIPMap(String &line) {
         key = line.before("=");
         key.removeWhiteSpace();
         value = line.after("=");
+        value.removeWhiteSpace();
+        String normalised(value);
+        normalised.toLower();
+        if (normalised.startsWith("filter"))
+            normalised = normalised.after("filter");
+        if (normalised.startsWith("group"))
+            normalised = normalised.after("group");
+        normalised.removeWhiteSpace();
+        String digits;
+        const char *ptr = normalised.toCharArray();
+        for (size_t i = 0; ptr[i] != '\0'; ++i) {
+            if (isdigit(static_cast<unsigned char>(ptr[i]))) {
+                digits += ptr[i];
+            } else if (digits.length() > 0) {
+                break;
+            }
+        }
+        if (digits.length() > 0)
+            normalised = digits;
+        value = normalised;
         value.removeWhiteSpace();
         if (value.startsWith("filter"))
             value = value.after("filter");
