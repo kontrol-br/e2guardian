@@ -50,6 +50,10 @@ if(userin,defaultusermap) return setgroup
 function(auth_proxy_ident)
 if(userin,defaultusermap) return setgroup
 
+# ident auth plugin (native IDENT client lookup)
+function(auth_ident)
+if(userin,defaultusermap) return setgroup
+
 function(auth_proxy_ntlm)
 if(userin,defaultusermap) return setgroup
 
