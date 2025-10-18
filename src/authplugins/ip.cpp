@@ -441,7 +441,7 @@ int ipinstance::determineGroup(std::string &user, int &rfg, StoryBoard &story, N
     fg = inList(addr);
     SpecialIpGroup special = decode_hidden_group(fg);
     if (apply_hidden_group(special, user, cm)) {
-        rfg = cm.filtergroup;
+        cm.filtergroup = rfg;
         return E2AUTH_NOGROUP;
     }
     if (fg >= 0) {
@@ -461,7 +461,7 @@ int ipinstance::determineGroup(std::string &user, int &rfg, StoryBoard &story, N
     fg = inSubnet(addr);
     special = decode_hidden_group(fg);
     if (apply_hidden_group(special, user, cm)) {
-        rfg = cm.filtergroup;
+        cm.filtergroup = rfg;
         return E2AUTH_NOGROUP;
     }
     if (fg >= 0) {
@@ -481,7 +481,7 @@ int ipinstance::determineGroup(std::string &user, int &rfg, StoryBoard &story, N
     fg = inRange(addr);
     special = decode_hidden_group(fg);
     if (apply_hidden_group(special, user, cm)) {
-        rfg = cm.filtergroup;
+        cm.filtergroup = rfg;
         return E2AUTH_NOGROUP;
     }
     if (fg >= 0) {
