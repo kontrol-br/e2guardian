@@ -25,6 +25,10 @@
 #include <list>
 #include <vector>
 #include <cctype>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <cerrno>
+#include <cstring>
 
 // GLOBALS
 
@@ -110,6 +114,46 @@ class ipinstance : public AuthPlugin
 
 // IMPLEMENTATION
 
+namespace
+{
+int ensure_directories(const std::string &path)
+{
+    if (path.empty())
+        return 0;
+
+    for (size_t pos = 1; pos < path.size(); ++pos) {
+        if (path[pos] != '/')
+            continue;
+
+        std::string sub = path.substr(0, pos);
+        if (sub.empty())
+            continue;
+
+        if (mkdir(sub.c_str(), 0755) == -1 && errno != EEXIST)
+            return -1;
+    }
+
+    if (mkdir(path.c_str(), 0755) == -1 && errno != EEXIST)
+        return -1;
+
+    return 0;
+}
+
+bool copy_file(const std::string &source, const std::string &destination)
+{
+    std::ifstream in(source.c_str(), std::ios::binary);
+    if (!in)
+        return false;
+
+    std::ofstream out(destination.c_str(), std::ios::binary | std::ios::trunc);
+    if (!out)
+        return false;
+
+    out << in.rdbuf();
+    return out.good();
+}
+} // namespace
+
 // class factory code *MUST* be included in every plugin
 
 AuthPlugin *ipcreate(ConfigVar &definition)
@@ -194,6 +238,61 @@ int ipinstance::init(void *args)
         if (!is_daemonised)
             std::cerr << thread_id << "No ipgroups file defined for IP auth plugin" << std::endl;
         syslog(LOG_ERR, "No ipgroups file defined for IP auth plugin");
+        return -1;
+    }
+
+    if (access(ipgroups_path.c_str(), R_OK) != 0) {
+        std::string directory;
+        std::string::size_type separator = ipgroups_path.find_last_of('/');
+        if (separator != std::string::npos)
+            directory = ipgroups_path.substr(0, separator);
+
+        if (!directory.empty()) {
+            if (ensure_directories(directory) == -1) {
+                int saved_errno = errno;
+                if (!is_daemonised)
+                    std::cerr << thread_id << "Unable to create directory for ipgroups file (" << directory
+                              << "): " << strerror(saved_errno) << std::endl;
+                syslog(LOG_ERR, "Unable to create directory for ipgroups file (%s): %s", directory.c_str(),
+                       strerror(saved_errno));
+                return -1;
+            }
+        }
+
+        bool created = false;
+        std::string sample_path = ipgroups_path + ".sample";
+        errno = 0;
+        if (access(sample_path.c_str(), R_OK) == 0) {
+            created = copy_file(sample_path, ipgroups_path);
+        } else {
+            std::ofstream out(ipgroups_path.c_str(), std::ios::out | std::ios::trunc);
+            if (out) {
+                out << "# e2guardian ipgroups auto-generated" << std::endl;
+                out << "# Formato: <filtro> <IP>/<mascara> ou <inicio>-<fim>" << std::endl;
+                created = true;
+            }
+        }
+
+        if (created) {
+            if (!is_daemonised)
+                std::cerr << thread_id << "Created default ipgroups file at " << ipgroups_path << std::endl;
+            syslog(LOG_INFO, "Created default ipgroups file at %s", ipgroups_path.c_str());
+        } else {
+            int saved_errno = errno != 0 ? errno : EIO;
+            if (!is_daemonised)
+                std::cerr << thread_id << "Unable to create ipgroups file at " << ipgroups_path << ": "
+                          << strerror(saved_errno) << std::endl;
+            syslog(LOG_ERR, "Unable to create ipgroups file at %s: %s", ipgroups_path.c_str(), strerror(saved_errno));
+            return -1;
+        }
+    }
+
+    if (access(ipgroups_path.c_str(), R_OK) != 0) {
+        int saved_errno = errno;
+        if (!is_daemonised)
+            std::cerr << thread_id << "ipgroups file not readable at " << ipgroups_path << ": "
+                      << strerror(saved_errno) << std::endl;
+        syslog(LOG_ERR, "ipgroups file not readable at %s: %s", ipgroups_path.c_str(), strerror(saved_errno));
         return -1;
     }
 
