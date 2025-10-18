@@ -867,7 +867,7 @@ int ConnectionHandler::handleConnection(Socket &peerconn, String &ip, bool ismit
             // TODO this needs moving is proxy operation is still to be tested
             if (checkme.urldomain == o.internal_test_url) {
                 peerconn.writeString(
-                        "HTTP/1.1 200 \nContent-Type: text/html\n\n<HTML><HEAD><TITLE>e2guardian internal test</TITLE></HEAD><BODY><H1>e2guardian internal test OK</H1> ");
+                        "HTTP/1.1 200 \nContent-Type: text/html\n\n<HTML><HEAD><TITLE>KONTROL internal test</TITLE></HEAD><BODY><H1>KONTROL internal test OK</H1> ");
                 peerconn.writeString("</BODY></HTML>\n");
                 proxysock.close(); // close connection to proxy
                 break;
@@ -1058,7 +1058,7 @@ int ConnectionHandler::handleConnection(Socket &peerconn, String &ip, bool ismit
 
             if (checkme.urldomain == o.internal_status_url) {
                 peerconn.writeString(
-                        "HTTP/1.1 200 \nContent-Type: text/html\n\n<HTML><HEAD><TITLE>e2guardian internal status</TITLE></HEAD><BODY><H1>e2guardian internal status OK</H1> ");
+                        "HTTP/1.1 200 \nContent-Type: text/html\n\n<HTML><HEAD><TITLE>KONTROL internal status</TITLE></HEAD><BODY><H1>KONTROL internal status OK</H1> ");
                 String temp = "User: ";
                 temp += clientuser;
                 temp += "<br>";
@@ -1124,7 +1124,7 @@ int ConnectionHandler::handleConnection(Socket &peerconn, String &ip, bool ismit
 		if (ldl->fg[filtergroup]->reporting_level != -1){
                 	checkme.isItNaughty = checkme.isBlocked;
 		} else {
-			checkme.isItNaughty = false; 
+			checkme.isItNaughty = false;
 		        checkme.isBlocked = false;
 		}
             }
@@ -1342,7 +1342,7 @@ int ConnectionHandler::handleConnection(Socket &peerconn, String &ip, bool ismit
 		if (ldl->fg[filtergroup]->reporting_level != -1){
                 	checkme.isItNaughty = checkme.isBlocked;
 		} else {
-			checkme.isItNaughty = false; 
+			checkme.isItNaughty = false;
 		        checkme.isBlocked = false;
 		        checkme.isGrey = true;
 		}
@@ -1694,7 +1694,7 @@ void ConnectionHandler::doRQLog(std::string &who, std::string &from, NaughtyFilt
     std::string data, cr("\n");
 
 //    if ((isexception && (o.log_exception_hits == 2))
-//        || isnaughty || o.ll == 3 || (o.ll == 2 && istext)) 
+//        || isnaughty || o.ll == 3 || (o.ll == 2 && istext))
     if(true) {
 
         // Item length limit put back to avoid log listener
@@ -1899,9 +1899,9 @@ bool ConnectionHandler::genDenyAccess(Socket &peerconn, String &eheader, String 
             if ((*header).requestType().startsWith("CONNECT"))
 #endif
             {
-        // Block ssl website    
+        // Block ssl website
         // Buggy with FF < 65 https://bugzilla.mozilla.org/show_bug.cgi?id=1522093
-	// Connections still opened after a refresh 
+	// Connections still opened after a refresh
 	// 403 requests made ICAP error with high load
 		eheader = "HTTP/1.1 302 Redirect";
 		eheader += "\r\nLocation: http://internal.test.e2guardian.org";
@@ -1961,7 +1961,7 @@ bool ConnectionHandler::genDenyAccess(Socket &peerconn, String &eheader, String 
                         eheader = "HTTP/1.1 200 \r\n";
                         eheader += o.language_list.getTranslation(1101); // advert blocked
                         eheader += "\r\nContent-Type: text/html\r\n";
-                        ebody = "<HTML><HEAD><TITLE>E2guardian - ";
+                        ebody = "<HTML><HEAD><TITLE>KONTROL - ";
                         ebody += o.language_list.getTranslation(1101); // advert blocked
                         ebody += "</TITLE></HEAD><BODY><CENTER><FONT SIZE=\"-1\"><A HREF=\"";
                         ebody += (*url);
@@ -2062,9 +2062,9 @@ bool ConnectionHandler::genDenyAccess(Socket &peerconn, String &eheader, String 
             if ((*header).requestType().startsWith("CONNECT"))
 #endif
 		{
-        // Block ssl website    
+        // Block ssl website
         // Buggy with FF < 65 https://bugzilla.mozilla.org/show_bug.cgi?id=1522093
-	// Connections still opened after a refresh 
+	// Connections still opened after a refresh
 	// 403 requests made ICAP error with high load
 		eheader = "HTTP/1.1 302 Redirect";
 		eheader += "\r\nLocation: http://internal.test.e2guardian.org";
@@ -2164,9 +2164,9 @@ bool ConnectionHandler::genDenyAccess(Socket &peerconn, String &eheader, String 
         else if (reporting_level == 0) {
             eheader = "HTTP/1.1 200 OK\r\n";
             eheader += "Content-type: text/html\r\n";
-            ebody = "<HTML><HEAD><TITLE>e2guardian - ";
+            ebody = "<HTML><HEAD><TITLE>KONTROL - ";
             ebody += o.language_list.getTranslation(1); // access denied
-            ebody += "</TITLE></HEAD><BODY><CENTER><H1>e2guardian - ";
+            ebody += "</TITLE></HEAD><BODY><CENTER><H1>KONTROL - ";
             ebody += o.language_list.getTranslation(1); // access denied
             ebody += "</H1></CENTER></BODY></HTML>\r\n";
             eheader += "Content-Length: ";
@@ -2655,9 +2655,9 @@ ConnectionHandler::gen_error_mess(Socket &peerconn, NaughtyFilter &cm, String &e
     cm.message_no = mess_no1;
     eheader = "HTTP/1.1 " + mess + "\nContent-Type: text/html\r\nConnection: Close\r\n";
     if(mess_no1 > 0) {
-        ebody = "<HTML><HEAD><TITLE>e2guardian - ";
+        ebody = "<HTML><HEAD><TITLE>KONTROL - ";
         ebody += mess;
-        ebody += "</TITLE></HEAD><BODY><H1>e2guardian - ";
+        ebody += "</TITLE></HEAD><BODY><H1>KONTROL - ";
         ebody += mess;
         ebody += "</H1>";
         if (mess_no1 > 0)
@@ -3776,7 +3776,7 @@ int ConnectionHandler::handleICAPConnection(Socket &peerconn, String &ip, Socket
                         //send error response
                             wline = "ICAP/1.0 408 Request timeout\r\n";
                             wline += "Service: ";
-			    wline += PACKAGE_STRING; 
+			    wline += PACKAGE_STRING;
 			    wline  += "\r\n";
                             wline += "Encapsulated: null-body=0\r\n";
                             wline += "\r\n";
@@ -3875,7 +3875,7 @@ int ConnectionHandler::handleICAPConnection(Socket &peerconn, String &ip, Socket
                 wline = "ICAP/1.0 200 OK\r\n";
                 wline += "Methods: REQMOD\r\n";
                 wline += "Service: ";
-		wline += PACKAGE_STRING; 
+		wline += PACKAGE_STRING;
 		wline  += "\r\n";
                 wline += "ISTag: \"";
                 wline += ldl->ISTag();
@@ -3899,7 +3899,7 @@ int ConnectionHandler::handleICAPConnection(Socket &peerconn, String &ip, Socket
                 wline = "ICAP/1.0 200 OK\r\n";
                 wline += "Methods: RESPMOD\r\n";
                 wline += "Service: ";
-		wline += PACKAGE_STRING; 
+		wline += PACKAGE_STRING;
 		wline  += "\r\n";
                 wline += "ISTag:";
                 wline += ldl->ISTag();
@@ -3922,7 +3922,7 @@ int ConnectionHandler::handleICAPConnection(Socket &peerconn, String &ip, Socket
                 (icaphead.service_resmod && !icaphead.icap_resmod_service)) {
                 wline = "ICAP/1.0 405 Method not allowed for service\r\n";
                 wline += "Service: ";
-		wline += PACKAGE_STRING; 
+		wline += PACKAGE_STRING;
 		wline  += "\r\n";
                 wline += "Encapsulated: null-body=0\r\n";
                 wline += "\r\n";
@@ -3940,7 +3940,7 @@ int ConnectionHandler::handleICAPConnection(Socket &peerconn, String &ip, Socket
                 //send error response
                 wline = "ICAP/1.0 400 Bad request\r\n";
                 wline += "Service: ";
-		wline += PACKAGE_STRING; 
+		wline += PACKAGE_STRING;
 		wline  += "\r\n";
                 peerconn.writeString(wline.toCharArray());
 #ifndef NEWDEBUG_OFF
@@ -4156,7 +4156,7 @@ int ConnectionHandler::handleICAPreqmod(Socket &peerconn, String &ip, NaughtyFil
 	if (ldl->fg[filtergroup]->reporting_level != -1){
                	checkme.isItNaughty = checkme.isBlocked;
 	} else {
-		checkme.isItNaughty = false; 
+		checkme.isItNaughty = false;
 	        checkme.isBlocked = false;
 	}
     }
@@ -4301,7 +4301,7 @@ int ConnectionHandler::handleICAPresmod(Socket &peerconn, String &ip, NaughtyFil
     {
         String wline = "ICAP/1.0 418 Bad composition - X-ICAP-E2G header not present\r\n";
         wline += "Service: ";
-	wline += PACKAGE_STRING; 
+	wline += PACKAGE_STRING;
 	wline  += "\r\n";
         wline += "Encapsulated: null-body=0\r\n";
         wline += "\r\n";
@@ -4416,7 +4416,7 @@ int ConnectionHandler::handleICAPresmod(Socket &peerconn, String &ip, NaughtyFil
 	   if (ldl->fg[filtergroup]->reporting_level != -1){
                	checkme.isItNaughty = checkme.isBlocked;
 	   } else {
-		checkme.isItNaughty = false; 
+		checkme.isItNaughty = false;
 	        checkme.isBlocked = false;
 	   }
     }
@@ -4523,4 +4523,3 @@ int ConnectionHandler::determineGroup(std::string &user, int &fg, StoryBoard &st
     fg = cm.filtergroup;
     return E2AUTH_OK;
 }
-
