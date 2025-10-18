@@ -176,8 +176,13 @@ bool apply_hidden_group(SpecialIpGroup special, const std::string &user, Naughty
     if (special == SpecialIpGroup::Exception) {
         cm.isexception = true;
         cm.isException = true;
+        cm.special_exception_ip = true;
+        cm.nomitm = true;
+        cm.automitm = false;
     } else if (special == SpecialIpGroup::Banned) {
         cm.isBlocked = true;
+        cm.isItNaughty = true;
+        cm.special_banned_ip = true;
     }
 
     return true;

@@ -112,6 +112,8 @@ class NaughtyFilter
     bool tunnel_2way = false;
     bool is_text = false;
     bool issiteonly = false;
+    bool special_exception_ip = false;
+    bool special_banned_ip = false;
     int auth_result = 0;
     String search_words;
     String search_terms;
