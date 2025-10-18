@@ -24,6 +24,7 @@
 #include <unistd.h>
 #include <list>
 #include <vector>
+#include <cctype>
 
 // GLOBALS
 
@@ -104,6 +105,7 @@ class ipinstance : public AuthPlugin
     int inList(const uint32_t &ip);
     int inSubnet(const uint32_t &ip);
     int inRange(const uint32_t &ip);
+    int parseFilterGroup(const String &value, const char *filename, const String &line, bool &warn);
 };
 
 // IMPLEMENTATION
@@ -238,8 +240,12 @@ int ipinstance::identify(Socket &peercon, Socket &proxycon, HTTPHeader &h, std::
         string = h.getClientIP();
         // otherwise, grab the IP directly from the client connection
         if (string.length() == 0)
-    	    string = peercon.getPeerIP();
+            string = peercon.getPeerIP();
     }
+    if (string.length() == 0)
+        string = peercon.getPeerIP();
+    if (string.length() == 0)
+        string = "-";
     authrec.user_name = string;
     authrec.user_source = "ip";
     is_real_user = true;
@@ -249,7 +255,13 @@ int ipinstance::identify(Socket &peercon, Socket &proxycon, HTTPHeader &h, std::
 int ipinstance::determineGroup(std::string &user, int &rfg, StoryBoard &story, NaughtyFilter &cm)
 {
     struct in_addr sin;
-    inet_aton(user.c_str(), &sin);
+    if (inet_aton(user.c_str(), &sin) == 0) {
+        if (!is_daemonised)
+            std::cerr << thread_id << "Unable to parse client IP \"" << user << "\" for IP auth" << std::endl;
+        syslog(LOG_ERR, "Unable to parse client IP %s for IP auth", user.c_str());
+        (void)story;
+        return E2AUTH_NOMATCH;
+    }
     uint32_t addr = ntohl(sin.s_addr);
     int fg;
     // check straight IPs, subnets, and ranges
@@ -260,6 +272,8 @@ int ipinstance::determineGroup(std::string &user, int &rfg, StoryBoard &story, N
         if (cm.authrec != nullptr) {
             cm.authrec->group_source = "ip";
             cm.authrec->filter_group = rfg;
+            if (cm.authrec->user_name.length() == 0)
+                cm.authrec->user_name = user;
         }
 #ifdef E2DEBUG
         std::cerr << thread_id << "Matched IP " << user << " to straight IP list" << std::endl;
@@ -273,6 +287,8 @@ int ipinstance::determineGroup(std::string &user, int &rfg, StoryBoard &story, N
         if (cm.authrec != nullptr) {
             cm.authrec->group_source = "ip";
             cm.authrec->filter_group = rfg;
+            if (cm.authrec->user_name.length() == 0)
+                cm.authrec->user_name = user;
         }
 #ifdef E2DEBUG
         std::cerr << thread_id << "Matched IP " << user << " to subnet" << std::endl;
@@ -286,6 +302,8 @@ int ipinstance::determineGroup(std::string &user, int &rfg, StoryBoard &story, N
         if (cm.authrec != nullptr) {
             cm.authrec->group_source = "ip";
             cm.authrec->filter_group = rfg;
+            if (cm.authrec->user_name.length() == 0)
+                cm.authrec->user_name = user;
         }
 #ifdef E2DEBUG
         std::cerr << thread_id << "Matched IP " << user << " to range" << std::endl;
@@ -349,6 +367,40 @@ int ipinstance::inRange(const uint32_t &ip)
     }
     return -1;
 }
+
+int ipinstance::parseFilterGroup(const String &value, const char *filename, const String &line, bool &warn)
+{
+    String normalised(value);
+    normalised.toLower();
+    normalised.removeWhiteSpace();
+    if (normalised.startsWith("filter"))
+        normalised = normalised.after("filter");
+    if (normalised.startsWith("group"))
+        normalised = normalised.after("group");
+    normalised.removeWhiteSpace();
+
+    String digits;
+    const char *ptr = normalised.toCharArray();
+    for (size_t i = 0; ptr[i] != '\0'; ++i) {
+        if (isdigit(static_cast<unsigned char>(ptr[i]))) {
+            digits += ptr[i];
+        } else if (digits.length() > 0) {
+            break;
+        }
+    }
+
+    String numeric = digits.length() > 0 ? digits : normalised;
+    int group = numeric.toInteger();
+    if ((group < 1) || (group > o.filter_groups)) {
+        if (!is_daemonised)
+            std::cerr << thread_id << "Filter group out of range; entry " << line << " in " << filename << std::endl;
+        syslog(LOG_ERR, "Filter group out of range; entry %s in %s", line.toCharArray(), filename);
+        warn = true;
+        return -1;
+    }
+
+    return group - 1;
+}
 // read in a list linking IPs, subnets & IP ranges to filter groups
 // return 0 for success, -1 for failure, 1 for warning
 int ipinstance::readIPMelangeList(const char *filename)
@@ -398,7 +450,8 @@ int ipinstance::readIPMelangeList(const char *filename)
         if (line.contains("=")) {
             key = line.before("=");
             key.removeWhiteSpace();
-            value = line.after("filter");
+            value = line.after("=");
+            value.removeWhiteSpace();
         } else {
             if (!is_daemonised)
                 std::cerr << thread_id << "No filter group given; entry " << line << " in " << filename << std::endl;
@@ -406,22 +459,14 @@ int ipinstance::readIPMelangeList(const char *filename)
             warn = true;
             continue;
         }
-#ifdef E2DEBUG
-        std::cerr << thread_id << "key: " << key << std::endl;
-        std::cerr << thread_id << "value: " << value.toInteger() << std::endl;
-#endif
-        if ((value.toInteger() < 1) || (value.toInteger() > o.filter_groups)) {
-            if (!is_daemonised)
-                std::cerr << thread_id << "Filter group out of range; entry " << line << " in " << filename << std::endl;
-            syslog(LOG_ERR, "Filter group out of range; entry %s in %s", line.toCharArray(), filename);
-            warn = true;
+        int group = parseFilterGroup(value, filename, line, warn);
+        if (group < 0)
             continue;
-        }
         // store the IP address (numerically, not as a string) and filter group in either the IP list, subnet list or range list
         if (matchIP.match(key.toCharArray(),Rre)) {
             struct in_addr address;
             if (inet_aton(key.toCharArray(), &address)) {
-                iplist.push_back(ip(ntohl(address.s_addr), value.toInteger() - 1));
+                iplist.push_back(ip(ntohl(address.s_addr), group));
             }
         } else if (matchSubnet.match(key.toCharArray(),Rre)) {
             struct in_addr address;
@@ -434,7 +479,7 @@ int ipinstance::readIPMelangeList(const char *filename)
                 s.mask = ntohl(addressmask.s_addr);
                 // pre-mask the address for quick comparison
                 s.maskedaddr = addr & s.mask;
-                s.group = value.toInteger() - 1;
+                s.group = group;
                 ipsubnetlist.push_back(s);
             }
         } else if (matchCIDR.match(key.toCharArray(),Rre)) {
@@ -452,7 +497,7 @@ int ipinstance::readIPMelangeList(const char *filename)
                     s.mask = ntohl(addressmask.s_addr);
                     // pre-mask the address for quick comparison
                     s.maskedaddr = addr & s.mask;
-                    s.group = value.toInteger() - 1;
+                    s.group = group;
                     ipsubnetlist.push_back(s);
                 }
             }
@@ -465,7 +510,7 @@ int ipinstance::readIPMelangeList(const char *filename)
                 ip_range_entry r;
                 r.startaddr = ntohl(addressstart.s_addr);
                 r.endaddr = ntohl(addressend.s_addr);
-                r.group = value.toInteger() - 1;
+                r.group = group;
                 iprangelist.push_back(r);
             }
         }
