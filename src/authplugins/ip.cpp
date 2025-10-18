@@ -38,6 +38,11 @@ extern thread_local std::string thread_id;
 
 // DECLARATIONS
 
+namespace
+{
+enum class SpecialIpGroup;
+}
+
 // structs linking subnets and IP ranges to filter groups
 struct ip_subnet_entry
 {
@@ -93,11 +98,11 @@ class ipinstance : public AuthPlugin
         client_ip_based = true;
     };
 
-    int identify(Socket &peercon, Socket &proxycon, HTTPHeader &h, std::string &string, bool &is_real_user, auth_rec &authrec);
+    int identify(Socket &peercon, Socket &proxycon, HTTPHeader &h, std::string &string, bool &is_real_user, auth_rec &authrec) override;
     int determineGroup(std::string &user, int &rfg, StoryBoard &story, NaughtyFilter &cm) override;
 
-    int init(void *args);
-    int quit();
+    int init(void *args) override;
+    int quit() override;
 
     private:
     std::vector<ip> iplist;
