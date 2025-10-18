@@ -49,7 +49,7 @@ if(true) setgrey
 function(checkresponse)
 if(true) returnif hook_checkresponse
 if(exceptionset) return false
-if(responseheaderin,reponseheadermods) setmodheader
+if(responseheaderin,reponseheadermods,,,optional) setmodheader
 if(viruscheckset) checknoscantypes
 if(urlin,exceptionfile) return false
 if(true) return checkfiletype
@@ -125,8 +125,9 @@ function(localsslrequestcheck)
 if(true) returnif hook_localsslrequestcheck
 if(true) returnif sslchecktimesblocked
 if(sitein, localexception) return setexception
-if(sitein, localgreyssl) returnif sslcheckmitm
-if(sitein, localgrey) returnif sslcheckmitm
+if(sitein, localgreyssl,,,optional) returnif sslcheckmitm
+if(sitein, localgrey,,,optional) returnif sslcheckmitm
+if(sitein, localbannedssl,,,optional) return setblock
 if(sitein, localbanned) true
 ifnot(returnset) return false
 if(true) returnif sslcheckmitm
@@ -216,16 +217,16 @@ if(true) return sslcheckmitmgeneral
 function(sslcheckmitmgeneral)
 if(true) setgomitm
 ifnot(returnset) return false
-if(sitein, nocheckcert) setnocheckcert
+if(sitein, nocheckcert,,,optional) setnocheckcert
 if(true) sslreplace
 if(true) return true
 
 # Only go MITM when in greyssl list
 #  returns true if yes, false if no
 function(sslcheckmitmgreyonly)
-if(sitein, greyssl) setgomitm
+if(sitein, greyssl,,,optional) setgomitm
 ifnot(returnset) return false
-if(sitein, nocheckcert) setnocheckcert
+if(sitein, nocheckcert,,,optional) setnocheckcert
 if(true) sslreplace
 if(true) return true
 
@@ -236,16 +237,17 @@ if(true) returnif hook_sslrequestcheck
 if(true) returnif sslexceptioncheck
 if(true) returnif sslcheckmitm
 if(sitein, banned) return setblock
+if(sitein, bannedssl,,,optional) return setblock
 if(true) sslreplace
 ifnot(returnset) returnif sslcheckblanketblock
 if(true) setgrey
 
 function(checknoscanlists)
-if(urlin,exceptionvirus) unsetviruscheck
+if(urlin,exceptionvirus,,,optional) unsetviruscheck
 
 function(checknoscantypes)
-if(mimein,exceptionvirus) return unsetviruscheck
-if(extensionin,exceptionvirus) return unsetviruscheck
+if(mimein,exceptionvirus,,,optional) return unsetviruscheck
+if(extensionin,exceptionvirus,,,optional) return unsetviruscheck
 
 function(checknobypasslists)
 if(urlin,bannedbypass) return unsetbypassallow
@@ -280,6 +282,8 @@ function(icapsquidbump)
 # Overide in site.story or fn.story if only types in exception file type lists 
 # are to be allowed
 function(checkfiletype)
+if(extensionin, exceptionextension,,,optional) return false
+if(mimein, exceptionmime,,,optional) return false
 if(mimein, bannedmime) return setblock
 if(extensionin, bannedextension) return setblock
 
@@ -305,12 +309,12 @@ function(checktimesblocked)
 # returns true if log entry is to be made
 # This can be overriden in site.story (or fn.story) to log all for testing.
 function(checklogging)
-if(urlin,nolog) setnolog
+if(urlin,nolog,,,optional) setnolog
 if(returnset) return false
 if(true) return true
 
 function(is_search_term)
-if(urlin,searchtermexceptions) return false
+if(urlin,searchtermexceptions,,,optional) return false
 if(fullurlin,searchterms) setsearchterm
 if(returnset) return true
 
