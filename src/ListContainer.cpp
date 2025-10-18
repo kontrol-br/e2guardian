@@ -141,6 +141,33 @@ bool ensureListFileExists(const char *filename) {
     return true;
 }
 
+enum class SpecialIpGroup
+{
+    None,
+    Exception,
+    Banned
+};
+
+SpecialIpGroup classify_special_group(String token)
+{
+    token.toLower();
+    token.removeWhiteSpace();
+    token.removePunctuation();
+    token.removeChar('_');
+    token.removeChar('-');
+
+    if (token.length() == 0)
+        return SpecialIpGroup::None;
+
+    if ((token == "exceptioniplist") || (token == "exceptionlist") || (token == "exceptionip"))
+        return SpecialIpGroup::Exception;
+
+    if ((token == "bannediplist") || (token == "bannedlist") || (token == "bannedip"))
+        return SpecialIpGroup::Banned;
+
+    return SpecialIpGroup::None;
+}
+
 } // namespace
 
 
@@ -1691,7 +1718,15 @@ void ListContainer::addToDataMap(String &line) {
     if (line.contains("=")) {
         key = line.before("=");
         key.removeWhiteSpace();
-        value = line.after("=");
+        String group_value(line.after("="));
+        SpecialIpGroup special = classify_special_group(group_value);
+        if (special != SpecialIpGroup::None) {
+            if (!is_daemonised)
+                std::cerr << thread_id << "Ignoring special IP list entry " << line << " in " << sourcefile << std::endl;
+            syslog(LOG_INFO, "Ignoring special IP list entry %s in %s", line.toCharArray(), sourcefile.c_str());
+            return;
+        }
+        value = group_value;
         value.removeWhiteSpace();
         String normalised(value);
         normalised.toLower();
@@ -1738,7 +1773,15 @@ void ListContainer::addToIPMap(String &line) {
     if (line.contains("=")) {
         key = line.before("=");
         key.removeWhiteSpace();
-        value = line.after("=");
+        String group_value(line.after("="));
+        SpecialIpGroup special = classify_special_group(group_value);
+        if (special != SpecialIpGroup::None) {
+            if (!is_daemonised)
+                std::cerr << thread_id << "Ignoring special IP list entry " << line << " in " << sourcefile << std::endl;
+            syslog(LOG_INFO, "Ignoring special IP list entry %s in %s", line.toCharArray(), sourcefile.c_str());
+            return;
+        }
+        value = group_value;
         value.removeWhiteSpace();
         String normalised(value);
         normalised.toLower();
