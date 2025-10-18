@@ -109,7 +109,7 @@ class ipinstance : public AuthPlugin
     int inList(const uint32_t &ip);
     int inSubnet(const uint32_t &ip);
     int inRange(const uint32_t &ip);
-    int parseFilterGroup(const String &value, const char *filename, const String &line, bool &warn);
+    int parseFilterGroup(const String &value, const char *filename, const String &line, bool &warn, SpecialIpGroup &special_out);
 };
 
 // IMPLEMENTATION
@@ -144,6 +144,38 @@ SpecialIpGroup classify_special_group(String token)
         return SpecialIpGroup::Banned;
 
     return SpecialIpGroup::None;
+}
+
+SpecialIpGroup decode_hidden_group(int group)
+{
+    if (group == kHiddenExceptionGroup)
+        return SpecialIpGroup::Exception;
+    if (group == kHiddenBannedGroup)
+        return SpecialIpGroup::Banned;
+    return SpecialIpGroup::None;
+}
+
+bool apply_hidden_group(SpecialIpGroup special, const std::string &user, NaughtyFilter &cm)
+{
+    if (special == SpecialIpGroup::None)
+        return false;
+
+    if (cm.authrec != nullptr) {
+        cm.authrec->group_source = "ip";
+        cm.authrec->filter_group = -1;
+        cm.authrec->is_authed = true;
+        if (cm.authrec->user_name.length() == 0)
+            cm.authrec->user_name = user;
+    }
+
+    if (special == SpecialIpGroup::Exception) {
+        cm.isexception = true;
+        cm.isException = true;
+    } else if (special == SpecialIpGroup::Banned) {
+        cm.isBlocked = true;
+    }
+
+    return true;
 }
 
 int ensure_directories(const std::string &path)
@@ -402,6 +434,11 @@ int ipinstance::determineGroup(std::string &user, int &rfg, StoryBoard &story, N
     int fg;
     // check straight IPs, subnets, and ranges
     fg = inList(addr);
+    SpecialIpGroup special = decode_hidden_group(fg);
+    if (apply_hidden_group(special, user, cm)) {
+        rfg = cm.filtergroup;
+        return E2AUTH_NOGROUP;
+    }
     if (fg >= 0) {
         rfg = fg;
         cm.filtergroup = rfg;
@@ -417,6 +454,11 @@ int ipinstance::determineGroup(std::string &user, int &rfg, StoryBoard &story, N
         return E2AUTH_OK;
     }
     fg = inSubnet(addr);
+    special = decode_hidden_group(fg);
+    if (apply_hidden_group(special, user, cm)) {
+        rfg = cm.filtergroup;
+        return E2AUTH_NOGROUP;
+    }
     if (fg >= 0) {
         rfg = fg;
         cm.filtergroup = rfg;
@@ -432,6 +474,11 @@ int ipinstance::determineGroup(std::string &user, int &rfg, StoryBoard &story, N
         return E2AUTH_OK;
     }
     fg = inRange(addr);
+    special = decode_hidden_group(fg);
+    if (apply_hidden_group(special, user, cm)) {
+        rfg = cm.filtergroup;
+        return E2AUTH_NOGROUP;
+    }
     if (fg >= 0) {
         rfg = fg;
         cm.filtergroup = rfg;
@@ -504,9 +551,9 @@ int ipinstance::inRange(const uint32_t &ip)
     return -1;
 }
 
-int ipinstance::parseFilterGroup(const String &value, const char *filename, const String &line, bool &warn)
+int ipinstance::parseFilterGroup(const String &value, const char *filename, const String &line, bool &warn, SpecialIpGroup &special)
 {
-    SpecialIpGroup special = classify_special_group(value);
+    special = classify_special_group(value);
     if (special == SpecialIpGroup::Exception)
         return kHiddenExceptionGroup;
     if (special == SpecialIpGroup::Banned)
@@ -607,15 +654,15 @@ int ipinstance::readIPMelangeList(const char *filename)
             warn = true;
             continue;
         }
-        int group = parseFilterGroup(value, filename, line, warn);
-        if (group == kHiddenExceptionGroup || group == kHiddenBannedGroup) {
+        SpecialIpGroup special = SpecialIpGroup::None;
+        int group = parseFilterGroup(value, filename, line, warn, special);
+        if ((group < 0) && (special == SpecialIpGroup::None))
+            continue;
+        if (special != SpecialIpGroup::None) {
             if (!is_daemonised)
-                std::cerr << thread_id << "Ignoring special IP list entry " << line << " in " << filename << std::endl;
-            syslog(LOG_INFO, "Ignoring special IP list entry %s in %s", line.toCharArray(), filename);
-            continue;
+                std::cerr << thread_id << "Matched special IP list entry " << line << " in " << filename << std::endl;
+            syslog(LOG_INFO, "Matched special IP list entry %s in %s", line.toCharArray(), filename);
         }
-        if (group < 0)
-            continue;
         // store the IP address (numerically, not as a string) and filter group in either the IP list, subnet list or range list
         if (matchIP.match(key.toCharArray(),Rre)) {
             struct in_addr address;

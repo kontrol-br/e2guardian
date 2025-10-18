@@ -1720,36 +1720,38 @@ void ListContainer::addToDataMap(String &line) {
         key.removeWhiteSpace();
         String group_value(line.after("="));
         SpecialIpGroup special = classify_special_group(group_value);
-        if (special != SpecialIpGroup::None) {
-            if (!is_daemonised)
-                std::cerr << thread_id << "Ignoring special IP list entry " << line << " in " << sourcefile << std::endl;
-            syslog(LOG_INFO, "Ignoring special IP list entry %s in %s", line.toCharArray(), sourcefile.c_str());
-            return;
-        }
+        bool is_special = (special != SpecialIpGroup::None);
         value = group_value;
         value.removeWhiteSpace();
-        String normalised(value);
-        normalised.toLower();
-        if (normalised.startsWith("filter"))
-            normalised = normalised.after("filter");
-        if (normalised.startsWith("group"))
-            normalised = normalised.after("group");
-        normalised.removeWhiteSpace();
-        String digits;
-        const char *ptr = normalised.toCharArray();
-        for (size_t i = 0; ptr[i] != '\0'; ++i) {
-            if (isdigit(static_cast<unsigned char>(ptr[i]))) {
-                digits += ptr[i];
-            } else if (digits.length() > 0) {
-                break;
+        if (is_special) {
+            if (!is_daemonised)
+                std::cerr << thread_id << "Marking special IP list entry " << line << " in " << sourcefile << std::endl;
+            syslog(LOG_INFO, "Marking special IP list entry %s in %s", line.toCharArray(), sourcefile.c_str());
+            value = "";
+        } else {
+            String normalised(value);
+            normalised.toLower();
+            if (normalised.startsWith("filter"))
+                normalised = normalised.after("filter");
+            if (normalised.startsWith("group"))
+                normalised = normalised.after("group");
+            normalised.removeWhiteSpace();
+            String digits;
+            const char *ptr = normalised.toCharArray();
+            for (size_t i = 0; ptr[i] != '\0'; ++i) {
+                if (isdigit(static_cast<unsigned char>(ptr[i]))) {
+                    digits += ptr[i];
+                } else if (digits.length() > 0) {
+                    break;
+                }
             }
+            if (digits.length() > 0)
+                normalised = digits;
+            value = normalised;
+            value.removeWhiteSpace();
+            if (value.startsWith("filter"))
+                value = value.after("filter");
         }
-        if (digits.length() > 0)
-            normalised = digits;
-        value = normalised;
-        value.removeWhiteSpace();
-        if (value.startsWith("filter"))
-            value = value.after("filter");
     } else {
         if (!is_daemonised)
             std::cerr << thread_id << "No filter group given; entry " << line << " in " << sourcefile << std::endl;
@@ -1775,36 +1777,47 @@ void ListContainer::addToIPMap(String &line) {
         key.removeWhiteSpace();
         String group_value(line.after("="));
         SpecialIpGroup special = classify_special_group(group_value);
-        if (special != SpecialIpGroup::None) {
-            if (!is_daemonised)
-                std::cerr << thread_id << "Ignoring special IP list entry " << line << " in " << sourcefile << std::endl;
-            syslog(LOG_INFO, "Ignoring special IP list entry %s in %s", line.toCharArray(), sourcefile.c_str());
-            return;
-        }
+        bool is_special = (special != SpecialIpGroup::None);
         value = group_value;
         value.removeWhiteSpace();
-        String normalised(value);
-        normalised.toLower();
-        if (normalised.startsWith("filter"))
-            normalised = normalised.after("filter");
-        if (normalised.startsWith("group"))
-            normalised = normalised.after("group");
-        normalised.removeWhiteSpace();
-        String digits;
-        const char *ptr = normalised.toCharArray();
-        for (size_t i = 0; ptr[i] != '\0'; ++i) {
-            if (isdigit(static_cast<unsigned char>(ptr[i]))) {
-                digits += ptr[i];
-            } else if (digits.length() > 0) {
-                break;
+        if (is_special) {
+            if (!is_daemonised)
+                std::cerr << thread_id << "Marking special IP list entry " << line << " in " << sourcefile << std::endl;
+            syslog(LOG_INFO, "Marking special IP list entry %s in %s", line.toCharArray(), sourcefile.c_str());
+            value = "";
+        } else {
+            String normalised(value);
+            normalised.toLower();
+            if (normalised.startsWith("filter"))
+                normalised = normalised.after("filter");
+            if (normalised.startsWith("group"))
+                normalised = normalised.after("group");
+            normalised.removeWhiteSpace();
+            String digits;
+            const char *ptr = normalised.toCharArray();
+            for (size_t i = 0; ptr[i] != '\0'; ++i) {
+                if (isdigit(static_cast<unsigned char>(ptr[i]))) {
+                    digits += ptr[i];
+                } else if (digits.length() > 0) {
+                    break;
+                }
             }
+            if (digits.length() > 0)
+                normalised = digits;
+            value = normalised;
+            value.removeWhiteSpace();
         }
-        if (digits.length() > 0)
-            normalised = digits;
-        value = normalised;
-        value.removeWhiteSpace();
         if (value.startsWith("filter"))
             value = value.after("filter");
+        if (!is_special) {
+            if ((value.toInteger() < 1) || (value.toInteger() > o.filter_groups)) {
+                if (!is_daemonised)
+                    std::cerr << thread_id << "Filter group out of range; entry " << line << " in " << sourcefile << std::endl;
+                syslog(LOG_ERR, "Filter group out of range; entry %s in %s", line.toCharArray(), sourcefile.c_str());
+                //warn = true;
+                return;
+            }
+        }
     } else {
         if (!is_daemonised)
             std::cerr << thread_id << "No filter group given; entry " << line << " in " << sourcefile << std::endl;
@@ -1816,13 +1829,7 @@ void ListContainer::addToIPMap(String &line) {
     std::cerr << thread_id << "key: " << key << std::endl;
     std::cerr << thread_id << "value: " << value.toInteger() << std::endl;
 #endif
-    if ((value.toInteger() < 1) || (value.toInteger() > o.filter_groups)) {
-        if (!is_daemonised)
-            std::cerr << thread_id << "Filter group out of range; entry " << line << " in " << sourcefile << std::endl;
-        syslog(LOG_ERR, "Filter group out of range; entry %s in %s", line.toCharArray(), sourcefile.c_str());
-        //warn = true;
-        return;
-    }
+    // range check already performed for non-special entries above
 
     // store the IP address (numerically, not as a string) and filter group in either the IP list, subnet list or range list
     if (matchIP.match(key.toCharArray(), Rre)) {
