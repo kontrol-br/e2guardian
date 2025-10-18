@@ -1058,6 +1058,11 @@ int ConnectionHandler::handleConnection(Socket &peerconn, String &ip, bool ismit
             }
             checkme.filtergroup = filtergroup;
 
+            if (checkme.special_exception_ip) {
+                checkme.nomitm = true;
+                checkme.automitm = false;
+            }
+
 #ifdef E2DEBUG
             std::cerr << thread_id << " -username: " << clientuser << std::endl;
             std::cerr << thread_id << " -filtergroup: " << filtergroup << std::endl;
@@ -1140,7 +1145,7 @@ int ConnectionHandler::handleConnection(Socket &peerconn, String &ip, bool ismit
             // Start of Storyboard checking
             //
 //            if (!(checkme.isBlocked || checkme.isbypass))
-            if (!(checkme.isBlocked || checkme.isdone) && authed) {
+            if (!(checkme.isBlocked || checkme.isdone || checkme.special_exception_ip) && authed) {
 // Main checking is now done in Storyboard function(s)
                 //   String funct = "checkrequest";
                 //   ldl->fg[filtergroup]->StoryB.runFunct(funct, checkme);
@@ -1518,7 +1523,8 @@ void ConnectionHandler::doLog(std::string &who, std::string &from, NaughtyFilter
     unsigned int port = cm.request_header->port;
     std::string what;
 
-    ldl->fg[filtergroup]->StoryB.runFunctEntry(ENT_STORYB_LOG_CHECK, cm);
+    if (!(cm.special_exception_ip || cm.special_banned_ip))
+        ldl->fg[filtergroup]->StoryB.runFunctEntry(ENT_STORYB_LOG_CHECK, cm);
     if(cm.nolog) return;
 
     if(o.log_requests) {
@@ -1542,6 +1548,7 @@ void ConnectionHandler::doLog(std::string &who, std::string &from, NaughtyFilter
     bool wasscanned = cm.wasscanned;
     int naughtiness = cm.naughtiness;
     int filtergroup = cm.filtergroup;
+    int logged_filtergroup = (cm.special_exception_ip || cm.special_banned_ip) ? -1 : filtergroup;
     HTTPHeader *reqheader = cm.request_header;
     int message_no = cm.message_no;
     bool contentmodified = cm.contentmodified;
@@ -1655,7 +1662,7 @@ void ConnectionHandler::doLog(std::string &who, std::string &from, NaughtyFilter
         data += String(urlmodified) + cr;
         data += String(headermodified) + cr;
         data += String(size) + cr;
-        data += String(filtergroup) + cr;
+        data += String(logged_filtergroup) + cr;
         data += String(code) + cr;
         data += String(cachehit) + cr;
         data += String(mimetype) + cr;
@@ -1713,6 +1720,7 @@ void ConnectionHandler::doRQLog(std::string &who, std::string &from, NaughtyFilt
     bool wasscanned = false;  //cm.wasscanned;
     int naughtiness = 0;  //cm.naughtiness;
     int filtergroup = cm.filtergroup;
+    int logged_filtergroup = (cm.special_exception_ip || cm.special_banned_ip) ? -1 : filtergroup;
     HTTPHeader *reqheader = cm.request_header;
     int message_no = cm.message_no;
     bool contentmodified = false; //cm.contentmodified;
@@ -1767,7 +1775,7 @@ void ConnectionHandler::doRQLog(std::string &who, std::string &from, NaughtyFilt
         data += String(urlmodified) + cr;
         data += String(headermodified) + cr;
         data += String(size) + cr;
-        data += String(filtergroup) + cr;
+        data += String(logged_filtergroup) + cr;
         data += String(code) + cr;
         data += String(cachehit) + cr;
         data += String(mimetype) + cr;
