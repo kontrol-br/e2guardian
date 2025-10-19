@@ -27,7 +27,7 @@ class proxyinstance : public AuthPlugin
     proxyinstance(ConfigVar &definition)
         : AuthPlugin(definition)
     {
-        needs_proxy_query = true;
+        needs_proxy_query = false;
         client_ip_based = false;
     };
     int identify(Socket &peercon, Socket &proxycon, HTTPHeader &h, std::string &string, bool &is_real_user, auth_rec &authrec);
@@ -92,4 +92,3 @@ int proxyinstance::init(void *args)
         return -1;
     }
 }
-
