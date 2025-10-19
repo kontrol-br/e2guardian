@@ -27,6 +27,7 @@ EXTRA_DIST = domainsnobypass.in \
 
 install-data-local:
 	$(MKDIR_P) $(DESTDIR)$(E2DATADIR)
+	$(MKDIR_P) $(DESTDIR)$(E2DATADIR)/authplugins
 	for l in $(SAMPLELISTS) ; do \
 		if test ! -f $(DESTDIR)$(E2DATADIR)/$$l ; then \
 			echo "$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l"; \
