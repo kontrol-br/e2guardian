@@ -27,6 +27,7 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <list>
+#include <map>
 #include <cctype>
 
 // GLOBALS
@@ -38,6 +39,84 @@ extern thread_local std::string thread_id;
 // DEFINES
 
 #define ROOTNODESIZE 260
+
+std::string normalise_group_label(const String &value)
+{
+    std::string result;
+    result.reserve(value.length());
+    for (unsigned char ch : value) {
+        if (std::isalnum(ch))
+            result.push_back(static_cast<char>(std::tolower(ch)));
+    }
+    return result;
+}
+
+namespace
+{
+
+int parse_group_number_token(const String &token)
+{
+    std::string digits;
+    bool seen_digit = false;
+    for (unsigned char ch : token) {
+        if (std::isdigit(ch)) {
+            digits.push_back(static_cast<char>(ch));
+            seen_digit = true;
+        } else if (seen_digit) {
+            break;
+        }
+    }
+    if (!seen_digit)
+        return 0;
+
+    String numeric_value(digits.c_str());
+    int number = numeric_value.toInteger();
+    if (number < 1 || number > o.filter_groups)
+        return 0;
+    return number;
+}
+
+int resolve_group_number(const String &value, const std::map<std::string, int> &name_lookup)
+{
+    if (value.length() == 0)
+        return 0;
+
+    int number = parse_group_number_token(value);
+    if (number > 0)
+        return number;
+
+    std::string key = normalise_group_label(value);
+    if (key.empty())
+        return 0;
+
+    auto direct = name_lookup.find(key);
+    if (direct != name_lookup.end())
+        return direct->second;
+
+    static const char *prefixes[] = {"filtergroup", "filter", "group", "grp"};
+    for (const char *prefix : prefixes) {
+        size_t prefix_len = std::strlen(prefix);
+        if (key.compare(0, prefix_len, prefix) != 0)
+            continue;
+
+        std::string remainder = key.substr(prefix_len);
+        if (remainder.empty())
+            continue;
+
+        String remainder_string(remainder.c_str());
+        number = parse_group_number_token(remainder_string);
+        if (number > 0)
+            return number;
+
+        auto alias = name_lookup.find(remainder);
+        if (alias != name_lookup.end())
+            return alias->second;
+    }
+
+    return 0;
+}
+
+} // namespace
 #define MAXROOTLINKS ROOTNODESIZE - 4
 #define GRAPHENTRYSIZE 64
 #define MAXLINKS GRAPHENTRYSIZE - 4
@@ -1985,6 +2064,40 @@ const String *ListContainer::getMapData(String &key) {
     if (datamaplist.empty())
         return nullptr;
     return searchDataMap(0, datamaplist.size() - 1, key);
+}
+
+void ListContainer::normaliseDataMapGroups(const std::map<std::string, int> &name_lookup, const String &list_name)
+{
+    if (!is_map || is_iplist)
+        return;
+
+    bool modified = false;
+    for (auto &entry : datamaplist) {
+        if (entry.group.length() == 0)
+            continue;
+
+        int resolved = resolve_group_number(entry.group, name_lookup);
+        if (resolved > 0) {
+            if (entry.group.toInteger() != resolved) {
+                entry.group = String(resolved);
+                modified = true;
+            }
+            continue;
+        }
+
+        if (!is_daemonised) {
+            std::cerr << thread_id << "Unable to resolve filter group '" << entry.group
+                      << "' for entry " << entry.key << " in list " << list_name
+                      << " (" << sourcefile << ")" << std::endl;
+        }
+        syslog(LOG_ERR, "Unable to resolve filter group '%s' for entry %s in %s (%s)",
+               entry.group.toCharArray(), entry.key.toCharArray(), list_name.toCharArray(), sourcefile.c_str());
+        entry.group.clear();
+        modified = true;
+    }
+
+    if (modified)
+        std::stable_sort(datamaplist.begin(), datamaplist.end());
 }
 
 const String *ListContainer::getIPMapData(std::string &ip) {
