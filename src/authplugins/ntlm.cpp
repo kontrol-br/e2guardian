@@ -172,6 +172,13 @@ int ntlminstance::identify(Socket &peercon, Socket &proxycon, HTTPHeader &h, std
     }
     String at(h.getAuthType());
 
+    if ((at != "NTLM") && extract_forwarded_user(h, string)) {
+        authrec.user_name = string;
+        authrec.user_source = "forwarded";
+        is_real_user = true;
+        return E2AUTH_OK;
+    }
+
 // First dance with NTLM - initial auth negociation -
     if (transparent && (at != "NTLM")) {
         // obey forwarded-for options in what we send out
