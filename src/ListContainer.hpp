@@ -172,6 +172,8 @@ class ListContainer
 
     void graphSearch(std::map<std::string, std::pair<unsigned int, int> > &result, char *doc, off_t len);
 
+    void normaliseDataMapGroups(const std::map<std::string, int> &name_lookup, const String &list_name);
+
 
     bool isNow(int index = -1);   // used for normal and phrase lists
     bool isNowInTimelist();                 // used for timelists
@@ -275,7 +277,6 @@ class ListContainer
     const char *hIPtoChar(uint32_t ip);
     const String *inIPMap(const uint32_t &ip);
     const String *getMapData(String &key);
-    void normaliseDataMapGroups(const std::map<std::string, int> &name_lookup, const String &list_name);
 };
 
 #endif
