@@ -20,6 +20,8 @@
 
 // DECLARATIONS
 
+std::string normalise_group_label(const String &value);
+
 // time limit information
 struct TimeLimit {
     unsigned int sthour, stmin, endhour, endmin;
@@ -273,6 +275,7 @@ class ListContainer
     const char *hIPtoChar(uint32_t ip);
     const String *inIPMap(const uint32_t &ip);
     const String *getMapData(String &key);
+    void normaliseDataMapGroups(const std::map<std::string, int> &name_lookup, const String &list_name);
 };
 
 #endif

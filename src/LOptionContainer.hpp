@@ -114,6 +114,7 @@ class LOptionContainer
 
     //bool inIPList(const std::string *ip, ListContainer &list, std::string *&host);
     std::list<room_item> rooms;
+    void normaliseAuthMapGroups();
 };
 
 #endif

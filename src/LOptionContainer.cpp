@@ -19,6 +19,8 @@
 #include <syslog.h>
 #include <dirent.h>
 #include <cstdlib>
+#include <map>
+#include <utility>
 #include <unistd.h> // checkme: remove?
 
 // GLOBALS
@@ -146,9 +148,72 @@ LOptionContainer::LOptionContainer(int load_id)
         else
             syslog(LOG_INFO, "Error in reading filter group files");
     }
+    if (loaded_ok)
+        normaliseAuthMapGroups();
     reload_id = load_id;
     ++o.LC_cnt;
     if (load_id == 0)    o.numfg = numfg;   // do this on first load only
+}
+
+void LOptionContainer::normaliseAuthMapGroups()
+{
+    std::map<std::string, int> name_lookup;
+
+    auto add_alias = [&](const String &label, int group_no) {
+        if (label.length() == 0)
+            return;
+        std::string key = normalise_group_label(label);
+        if (key.empty())
+            return;
+        if (name_lookup.find(key) == name_lookup.end())
+            name_lookup.emplace(std::move(key), group_no);
+    };
+
+    for (int idx = 0; idx < numfg; ++idx) {
+        if (fg[idx] == nullptr)
+            continue;
+
+        String base_name;
+        if (!fg[idx]->name.empty())
+            base_name = fg[idx]->name.c_str();
+        else {
+            base_name = "group";
+            base_name += String(idx + 1);
+        }
+
+        add_alias(base_name, idx + 1);
+        if (base_name.contains(" "))
+            add_alias(base_name.before(" "), idx + 1);
+
+        String alias("group");
+        alias += String(idx + 1);
+        add_alias(alias, idx + 1);
+
+        alias = "filter";
+        alias += String(idx + 1);
+        add_alias(alias, idx + 1);
+
+        alias = "grp";
+        alias += String(idx + 1);
+        add_alias(alias, idx + 1);
+
+        alias = String(idx + 1);
+        add_alias(alias, idx + 1);
+    }
+
+    if (name_lookup.empty())
+        return;
+
+    for (const auto &info : LMeta.list_vec) {
+        if (info.type != LIST_TYPE_MAP)
+            continue;
+        if (info.list_ref >= o.lm.l.size())
+            continue;
+        ListContainer *container = o.lm.l[info.list_ref];
+        if (container == nullptr)
+            continue;
+        container->normaliseDataMapGroups(name_lookup, info.name);
+    }
 }
 
 
