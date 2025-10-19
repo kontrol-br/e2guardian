@@ -74,16 +74,13 @@ public:
     };
     String key;
     String group;
-    int operator<(const datamap &a) const
+    bool operator<(const datamap &a) const
     {
-        if (key.compare(a.key) < 0)
-            return 1;
-        return 0;
+        return key.compare(a.key) < 0;
     };
-    int operator==(const String &a) const
+    bool operator==(const String &a) const
     {
-        if( key.compare(a) == 0) return 1;
-        return 0;
+        return key.compare(a) == 0;
     };
 };
 
