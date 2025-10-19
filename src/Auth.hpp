@@ -16,6 +16,8 @@
 #include "ListContainer.hpp"
 #include "LOptionContainer.hpp"
 
+#include <string>
+
 // DEFINES
 
 // success
@@ -119,5 +121,13 @@ typedef AuthPlugin *authcreate_t(ConfigVar &);
 
 // Return an instance of the plugin defined in the given configuration file
 AuthPlugin *auth_plugin_load(const char *pluginConfigPath);
+
+// Normalise usernames prior to filter group lookups.  Removes domain prefixes
+// or Kerberos realms and trims surrounding whitespace.
+std::string normalise_auth_username(const std::string &raw);
+
+// Extract a forwarded identity from the X-Forwarded-For header when the
+// upstream proxy adds it as the last comma-separated value.
+bool extract_forwarded_user(HTTPHeader &h, std::string &username);
 
 #endif

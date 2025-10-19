@@ -16,6 +16,10 @@
 
 #include <iostream>
 #include <syslog.h>
+#include <algorithm>
+#include <cctype>
+#include <sstream>
+#include <arpa/inet.h>
 
 // GLOBALS
 
@@ -38,6 +42,79 @@ extern authcreate_t dnsauthcreate;
 #ifdef ENABLE_NTLM
 extern authcreate_t ntlmcreate;
 #endif
+
+namespace
+{
+std::string trim_copy(const std::string &value)
+{
+    auto begin = std::find_if_not(value.begin(), value.end(), [](unsigned char ch) { return std::isspace(ch); });
+    auto end = std::find_if_not(value.rbegin(), value.rend(), [](unsigned char ch) { return std::isspace(ch); }).base();
+    if (begin >= end)
+        return std::string();
+    return std::string(begin, end);
+}
+
+bool is_likely_ip(const std::string &token)
+{
+    if (token.empty())
+        return false;
+
+    struct in_addr v4;
+    if (inet_pton(AF_INET, token.c_str(), &v4) == 1)
+        return true;
+
+#ifdef AF_INET6
+    struct in6_addr v6;
+    if (inet_pton(AF_INET6, token.c_str(), &v6) == 1)
+        return true;
+#endif
+
+    return false;
+}
+}
+
+std::string normalise_auth_username(const std::string &raw)
+{
+    std::string result = trim_copy(raw);
+    if (result.empty())
+        return result;
+
+    size_t slash_pos = result.find_last_of("\\/");
+    if (slash_pos != std::string::npos && slash_pos + 1 < result.size())
+        result = result.substr(slash_pos + 1);
+
+    size_t at_pos = result.find('@');
+    if (at_pos != std::string::npos)
+        result = result.substr(0, at_pos);
+
+    // Remove surrounding quotes if present.
+    if (result.size() > 1 && ((result.front() == '"' && result.back() == '"') || (result.front() == '\'' && result.back() == '\'')))
+        result = result.substr(1, result.size() - 2);
+
+    return trim_copy(result);
+}
+
+bool extract_forwarded_user(HTTPHeader &h, std::string &username)
+{
+    std::string forwarded = h.getXForwardedForIP();
+    if (forwarded.empty())
+        return false;
+
+    std::stringstream stream(forwarded);
+    std::string token;
+    std::string candidate;
+    while (std::getline(stream, token, ',')) {
+        std::string trimmed = trim_copy(token);
+        if (!trimmed.empty())
+            candidate = trimmed;
+    }
+
+    if (candidate.empty() || is_likely_ip(candidate))
+        return false;
+
+    username = candidate;
+    return true;
+}
 
 // IMPLEMENTATION
 
@@ -71,6 +148,7 @@ int AuthPlugin::determineGroup(std::string &user, int &fg, StoryBoard & story, N
     if (user.length() < 1 || user == "-") {
         return E2AUTH_NOMATCH;
     }
+    user = normalise_auth_username(user);
     String u(user);
     String lastcategory;
     u.toLower(); // since the filtergroupslist is read in in lowercase, we should do this.

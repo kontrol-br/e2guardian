@@ -51,17 +51,27 @@ int proxyinstance::identify(Socket &peercon, Socket &proxycon, HTTPHeader &h, st
     // don't match for non-basic auth types
     String t(h.getAuthType());
     t.toLower();
-    if (t != "basic")
-        return E2AUTH_NOMATCH;
-    // extract username
-    string = h.getAuthData();
-    if (string.length() > 0) {
-        string.resize(string.find_first_of(':'));
+    if (t == "basic") {
+        // extract username
+        string = h.getAuthData();
+        if (string.length() > 0) {
+            string.resize(string.find_first_of(':'));
+            authrec.user_name = string;
+            authrec.user_source = "proxy";
+            is_real_user = true;
+            return E2AUTH_OK;
+        }
+    }
+
+    std::string forwarded_user;
+    if (extract_forwarded_user(h, forwarded_user)) {
+        string = forwarded_user;
         authrec.user_name = string;
-        authrec.user_source = "proxy";
-	is_real_user = true;
+        authrec.user_source = "forwarded";
+        is_real_user = true;
         return E2AUTH_OK;
     }
+
     return E2AUTH_NOMATCH;
 }
 
