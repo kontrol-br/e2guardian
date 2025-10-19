@@ -201,6 +201,14 @@ void LOptionContainer::normaliseAuthMapGroups()
         add_alias(alias, idx + 1);
     }
 
+    int default_group = 1;
+    if (o.default_fg >= 0 && o.default_fg < numfg)
+        default_group = o.default_fg + 1;
+
+    add_alias(String("default"), default_group);
+    add_alias(String("defaultgroup"), default_group);
+    add_alias(String("defaultfiltergroup"), default_group);
+
     if (name_lookup.empty())
         return;
 
