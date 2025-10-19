@@ -1023,7 +1023,7 @@ void ListContainer::doSort(const bool startsWith) { // sort by ending of line
         return;
     }
     if (is_map) {     // deal with datamaplist
-        //std::sort(datamaplist.begin(), datamaplist.end());
+        std::stable_sort(datamaplist.begin(), datamaplist.end());
         return;
     }
 
@@ -1718,6 +1718,7 @@ void ListContainer::addToDataMap(String &line) {
     if (line.contains("=")) {
         key = line.before("=");
         key.removeWhiteSpace();
+        key.toLower();
         String group_value(line.after("="));
         SpecialIpGroup special = classify_special_group(group_value);
         bool is_special = (special != SpecialIpGroup::None);
