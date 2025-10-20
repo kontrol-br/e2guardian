@@ -21,6 +21,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <sstream>
+#include <vector>
 #include <arpa/inet.h>
 #include <cerrno>
 #include <cstring>
@@ -110,12 +111,12 @@ void proxy_basic_debug_log(const char *fmt, ...)
     } else if (static_cast<size_t>(needed) < sizeof(stack_buffer)) {
         message.assign(stack_buffer, static_cast<size_t>(needed));
     } else {
-        std::string dynamic_buffer(static_cast<size_t>(needed) + 1, '\0');
+        std::vector<char> dynamic_buffer(static_cast<size_t>(needed) + 1, '\0');
         va_list args_retry;
         va_copy(args_retry, args);
         vsnprintf(dynamic_buffer.data(), dynamic_buffer.size(), fmt, args_retry);
         va_end(args_retry);
-        message.assign(dynamic_buffer.c_str());
+        message.assign(dynamic_buffer.data());
     }
     va_end(args);
 
