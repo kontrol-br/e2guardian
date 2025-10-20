@@ -29,6 +29,7 @@
 #include <sys/types.h>
 #include <cerrno>
 #include <cstring>
+#include <mutex>
 
 // GLOBALS
 
@@ -108,8 +109,17 @@ class ipinstance : public AuthPlugin
     std::vector<ip> iplist;
     std::list<ip_subnet_entry> ipsubnetlist;
     std::list<ip_range_entry> iprangelist;
+    std::string ipgroups_path_;
+    bool ipgroups_loaded_ = false;
+    bool ipgroups_parse_error_logged_ = false;
+    int ipgroups_reload_id_ = -1;
+    std::mutex ipgroups_mutex_;
 
-    int readIPMelangeList(const char *filename);
+    bool ensureIPGroupsLoadedLocked();
+    int readIPMelangeList(const char *filename,
+                          std::vector<ip> *iplist_out = nullptr,
+                          std::list<ip_subnet_entry> *ipsubnetlist_out = nullptr,
+                          std::list<ip_range_entry> *iprangelist_out = nullptr);
     int searchList(int a, int s, const uint32_t &ip);
     int inList(const uint32_t &ip);
     int inSubnet(const uint32_t &ip);
@@ -247,6 +257,10 @@ int ipinstance::quit()
     iplist.clear();
     ipsubnetlist.clear();
     iprangelist.clear();
+    ipgroups_path_.clear();
+    ipgroups_loaded_ = false;
+    ipgroups_parse_error_logged_ = false;
+    ipgroups_reload_id_ = -1;
     return 0;
 }
 
@@ -266,10 +280,10 @@ int ipinstance::init(void *args)
         return -1;
     }
 
-    std::string ipgroups_path;
+    std::string ipgroups_path_value;
     String fname(cv["ipgroups"]);
     if (fname.length() > 0) {
-        ipgroups_path = fname.toCharArray();
+        ipgroups_path_value = fname.toCharArray();
     } else {
         for (const auto &entry : o.ipmaplist_dq) {
             std::string token;
@@ -289,42 +303,42 @@ int ipinstance::init(void *args)
                 }
             }
             if (!name.empty() && name == "ipmap" && !path.empty()) {
-                ipgroups_path = path;
+                ipgroups_path_value = path;
                 break;
             }
         }
     }
 
-    if (ipgroups_path.empty()) {
+    if (ipgroups_path_value.empty()) {
         std::string default_ipgroups = std::string(__CONFDIR) + "/lists/authplugins/ipgroups";
-        ipgroups_path = default_ipgroups;
+        ipgroups_path_value = default_ipgroups;
 
         if (access(default_ipgroups.c_str(), R_OK) == 0) {
             if (!is_daemonised)
                 std::cerr << thread_id << "No ipgroups list defined for IP auth plugin, falling back to "
-                          << ipgroups_path << std::endl;
-            syslog(LOG_INFO, "No ipgroups list defined for IP auth plugin, falling back to %s", ipgroups_path.c_str());
+                          << ipgroups_path_value << std::endl;
+            syslog(LOG_INFO, "No ipgroups list defined for IP auth plugin, falling back to %s", ipgroups_path_value.c_str());
         } else {
             if (!is_daemonised)
                 std::cerr << thread_id << "No ipgroups list defined for IP auth plugin, creating default at "
-                          << ipgroups_path << std::endl;
+                          << ipgroups_path_value << std::endl;
             syslog(LOG_INFO, "No ipgroups list defined for IP auth plugin, creating default at %s",
-                   ipgroups_path.c_str());
+                   ipgroups_path_value.c_str());
         }
     }
 
-    if (ipgroups_path.empty()) {
+    if (ipgroups_path_value.empty()) {
         if (!is_daemonised)
             std::cerr << thread_id << "No ipgroups file defined for IP auth plugin" << std::endl;
         syslog(LOG_ERR, "No ipgroups file defined for IP auth plugin");
         return -1;
     }
 
-    if (access(ipgroups_path.c_str(), R_OK) != 0) {
+    if (access(ipgroups_path_value.c_str(), R_OK) != 0) {
         std::string directory;
-        std::string::size_type separator = ipgroups_path.find_last_of('/');
+        std::string::size_type separator = ipgroups_path_value.find_last_of('/');
         if (separator != std::string::npos)
-            directory = ipgroups_path.substr(0, separator);
+            directory = ipgroups_path_value.substr(0, separator);
 
         if (!directory.empty()) {
             if (ensure_directories(directory) == -1) {
@@ -339,12 +353,12 @@ int ipinstance::init(void *args)
         }
 
         bool created = false;
-        std::string sample_path = ipgroups_path + ".sample";
+        std::string sample_path = ipgroups_path_value + ".sample";
         errno = 0;
         if (access(sample_path.c_str(), R_OK) == 0) {
-            created = copy_file(sample_path, ipgroups_path);
+            created = copy_file(sample_path, ipgroups_path_value);
         } else {
-            std::ofstream out(ipgroups_path.c_str(), std::ios::out | std::ios::trunc);
+            std::ofstream out(ipgroups_path_value.c_str(), std::ios::out | std::ios::trunc);
             if (out) {
                 out << "# e2guardian ipgroups auto-generated" << std::endl;
                 out << "# Formato: <filtro> <IP>/<mascara> ou <inicio>-<fim>" << std::endl;
@@ -354,30 +368,39 @@ int ipinstance::init(void *args)
 
         if (created) {
             if (!is_daemonised)
-                std::cerr << thread_id << "Created default ipgroups file at " << ipgroups_path << std::endl;
-            syslog(LOG_INFO, "Created default ipgroups file at %s", ipgroups_path.c_str());
+                std::cerr << thread_id << "Created default ipgroups file at " << ipgroups_path_value << std::endl;
+            syslog(LOG_INFO, "Created default ipgroups file at %s", ipgroups_path_value.c_str());
         } else {
             int saved_errno = errno != 0 ? errno : EIO;
             if (!is_daemonised)
-                std::cerr << thread_id << "Unable to create ipgroups file at " << ipgroups_path << ": "
+                std::cerr << thread_id << "Unable to create ipgroups file at " << ipgroups_path_value << ": "
                           << strerror(saved_errno) << std::endl;
-            syslog(LOG_ERR, "Unable to create ipgroups file at %s: %s", ipgroups_path.c_str(), strerror(saved_errno));
+            syslog(LOG_ERR, "Unable to create ipgroups file at %s: %s", ipgroups_path_value.c_str(), strerror(saved_errno));
             return -1;
         }
     }
 
-    if (access(ipgroups_path.c_str(), R_OK) != 0) {
+    if (access(ipgroups_path_value.c_str(), R_OK) != 0) {
         int saved_errno = errno;
         if (!is_daemonised)
-            std::cerr << thread_id << "ipgroups file not readable at " << ipgroups_path << ": "
+            std::cerr << thread_id << "ipgroups file not readable at " << ipgroups_path_value << ": "
                       << strerror(saved_errno) << std::endl;
-        syslog(LOG_ERR, "ipgroups file not readable at %s: %s", ipgroups_path.c_str(), strerror(saved_errno));
+        syslog(LOG_ERR, "ipgroups file not readable at %s: %s", ipgroups_path_value.c_str(), strerror(saved_errno));
         return -1;
     }
 
-    int read_result = readIPMelangeList(ipgroups_path.c_str());
+    ipgroups_path_ = ipgroups_path_value;
+
+    int read_result = readIPMelangeList(ipgroups_path_value.c_str());
     if (read_result < 0)
         return read_result;
+
+    ipgroups_parse_error_logged_ = false;
+    ipgroups_loaded_ = true;
+    if (auto lists = o.currentLists())
+        ipgroups_reload_id_ = lists->reload_id;
+    else
+        ipgroups_reload_id_ = -1;
 
     read_def_fg();
     return read_result;
@@ -430,6 +453,42 @@ int ipinstance::identify(Socket &peercon, Socket &proxycon, HTTPHeader &h, std::
     return E2AUTH_OK;
 }
 
+bool ipinstance::ensureIPGroupsLoadedLocked()
+{
+    if (ipgroups_path_.empty())
+        return ipgroups_loaded_;
+
+    int current_reload_id = -1;
+    if (auto lists = o.currentLists())
+        current_reload_id = lists->reload_id;
+
+    if (!ipgroups_loaded_ || current_reload_id != ipgroups_reload_id_) {
+        std::vector<ip> new_iplist;
+        std::list<ip_subnet_entry> new_ipsubnetlist;
+        std::list<ip_range_entry> new_iprangelist;
+
+        int read_result = readIPMelangeList(ipgroups_path_.c_str(), &new_iplist, &new_ipsubnetlist, &new_iprangelist);
+        if (read_result < 0) {
+            if (!ipgroups_parse_error_logged_) {
+                if (!is_daemonised)
+                    std::cerr << thread_id << "Error reloading ipgroups file at " << ipgroups_path_ << std::endl;
+                syslog(LOG_ERR, "Error reloading ipgroups file at %s", ipgroups_path_.c_str());
+                ipgroups_parse_error_logged_ = true;
+            }
+            return ipgroups_loaded_;
+        }
+
+        ipgroups_parse_error_logged_ = false;
+        iplist.swap(new_iplist);
+        ipsubnetlist.swap(new_ipsubnetlist);
+        iprangelist.swap(new_iprangelist);
+        ipgroups_reload_id_ = current_reload_id;
+        ipgroups_loaded_ = true;
+    }
+
+    return ipgroups_loaded_;
+}
+
 int ipinstance::determineGroup(std::string &user, int &rfg, StoryBoard &story, NaughtyFilter &cm)
 {
     struct in_addr sin;
@@ -441,6 +500,9 @@ int ipinstance::determineGroup(std::string &user, int &rfg, StoryBoard &story, N
         return E2AUTH_NOMATCH;
     }
     uint32_t addr = ntohl(sin.s_addr);
+    std::lock_guard<std::mutex> guard(ipgroups_mutex_);
+    if (!ensureIPGroupsLoadedLocked())
+        return E2AUTH_NOMATCH;
     int fg;
     // check straight IPs, subnets, and ranges
     fg = inList(addr);
@@ -608,8 +670,19 @@ int ipinstance::parseFilterGroup(const String &value, const char *filename, cons
 }
 // read in a list linking IPs, subnets & IP ranges to filter groups
 // return 0 for success, -1 for failure, 1 for warning
-int ipinstance::readIPMelangeList(const char *filename)
+int ipinstance::readIPMelangeList(const char *filename,
+                                  std::vector<ip> *iplist_out,
+                                  std::list<ip_subnet_entry> *ipsubnetlist_out,
+                                  std::list<ip_range_entry> *iprangelist_out)
 {
+    std::vector<ip> &target_iplist = iplist_out ? *iplist_out : iplist;
+    std::list<ip_subnet_entry> &target_ipsubnetlist = ipsubnetlist_out ? *ipsubnetlist_out : ipsubnetlist;
+    std::list<ip_range_entry> &target_iprangelist = iprangelist_out ? *iprangelist_out : iprangelist;
+
+    target_iplist.clear();
+    target_ipsubnetlist.clear();
+    target_iprangelist.clear();
+
     // load in the list file
     std::ifstream input(filename);
     if (!input) {
@@ -677,7 +750,7 @@ int ipinstance::readIPMelangeList(const char *filename)
         if (matchIP.match(key.toCharArray(),Rre)) {
             struct in_addr address;
             if (inet_aton(key.toCharArray(), &address)) {
-                iplist.push_back(ip(ntohl(address.s_addr), group));
+                target_iplist.push_back(ip(ntohl(address.s_addr), group));
             }
         } else if (matchSubnet.match(key.toCharArray(),Rre)) {
             struct in_addr address;
@@ -691,7 +764,7 @@ int ipinstance::readIPMelangeList(const char *filename)
                 // pre-mask the address for quick comparison
                 s.maskedaddr = addr & s.mask;
                 s.group = group;
-                ipsubnetlist.push_back(s);
+                target_ipsubnetlist.push_back(s);
             }
         } else if (matchCIDR.match(key.toCharArray(),Rre)) {
             struct in_addr address;
@@ -713,7 +786,7 @@ int ipinstance::readIPMelangeList(const char *filename)
                 // pre-mask the address for quick comparison
                 s.maskedaddr = addr & s.mask;
                 s.group = group;
-                ipsubnetlist.push_back(s);
+                target_ipsubnetlist.push_back(s);
             }
         } else if (matchRange.match(key.toCharArray(),Rre)) {
             struct in_addr addressstart;
@@ -725,7 +798,7 @@ int ipinstance::readIPMelangeList(const char *filename)
                 r.startaddr = ntohl(addressstart.s_addr);
                 r.endaddr = ntohl(addressend.s_addr);
                 r.group = group;
-                iprangelist.push_back(r);
+                target_iprangelist.push_back(r);
             }
         }
         // hmmm. the key didn't match any of our regular expressions. output message & return a warning value.
@@ -740,24 +813,24 @@ int ipinstance::readIPMelangeList(const char *filename)
 #ifdef E2DEBUG
     std::cerr << thread_id << "starting sort" << std::endl;
 #endif
-    std::sort(iplist.begin(), iplist.end());
+    std::sort(target_iplist.begin(), target_iplist.end());
 #ifdef E2DEBUG
     std::cerr << thread_id << "sort complete" << std::endl;
     std::cerr << thread_id << "ip list dump:" << std::endl;
-    std::vector<ip>::const_iterator i = iplist.begin();
-    while (i != iplist.end()) {
+    std::vector<ip>::const_iterator i = target_iplist.begin();
+    while (i != target_iplist.end()) {
         std::cerr << thread_id << "IP: " << i->addr << " Group: " << i->group << std::endl;
         ++i;
     }
     std::cerr << thread_id << "subnet list dump:" << std::endl;
-    std::list<ip_subnet_entry>::const_iterator j = ipsubnetlist.begin();
-    while (j != ipsubnetlist.end()) {
+    std::list<ip_subnet_entry>::const_iterator j = target_ipsubnetlist.begin();
+    while (j != target_ipsubnetlist.end()) {
         std::cerr << thread_id << "Masked IP: " << j->maskedaddr << " Mask: " << j->mask << " Group: " << j->group << std::endl;
         ++j;
     }
     std::cerr << thread_id << "range list dump:" << std::endl;
-    std::list<ip_range_entry>::const_iterator k = iprangelist.begin();
-    while (k != iprangelist.end()) {
+    std::list<ip_range_entry>::const_iterator k = target_iprangelist.begin();
+    while (k != target_iprangelist.end()) {
         std::cerr << thread_id << "Start IP: " << k->startaddr << " End IP: " << k->endaddr << " Group: " << k->group << std::endl;
         ++k;
     }
