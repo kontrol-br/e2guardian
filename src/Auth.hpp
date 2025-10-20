@@ -130,17 +130,4 @@ std::string normalise_auth_username(const std::string &raw);
 // upstream proxy adds it as the last comma-separated value.
 bool extract_forwarded_user(HTTPHeader &h, std::string &username);
 
-// Debug helpers for proxy-basic tracing.
-void proxy_basic_debug_log(const char *fmt, ...);
-void group_trace_debug_log(const char *fmt, ...);
-
-class ProxyBasicDebugScope {
-public:
-    explicit ProxyBasicDebugScope(bool enable);
-    ~ProxyBasicDebugScope();
-
-private:
-    bool previous_;
-};
-
 #endif
