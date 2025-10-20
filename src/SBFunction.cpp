@@ -200,13 +200,13 @@ unsigned int SBFunction::getBIFunctID(String &action)  {    // get built-in func
     return 0;
 }
 
-String SBFunction::getState(unsigned int id) {     // get condition statement from state_id
+String SBFunction::getState(unsigned int id) const {     // get condition statement from state_id
     if (--id < SB_STATE_MAP_SIZE)
         return state_map[id];
     return "";
 };
 
-String SBFunction::getBIFunct(unsigned int &id) {    // get built-in function (action) from funct_id
+String SBFunction::getBIFunct(unsigned int &id) const {    // get built-in function (action) from funct_id
     if (id > 5000) {
         unsigned int i = id - 5001;
         if (i < SB_FUNC_MAP_SIZE)
@@ -215,6 +215,14 @@ String SBFunction::getBIFunct(unsigned int &id) {    // get built-in function (a
     return "";
 };
 
-String SBFunction::getName() {
+String SBFunction::getName() const {
     return name;
+}
+
+unsigned int SBFunction::getId() const {
+    return fn_id;
+}
+
+String SBFunction::getFileName() const {
+    return file_name;
 }

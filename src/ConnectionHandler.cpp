@@ -4637,10 +4637,23 @@ int ConnectionHandler::determineGroup(std::string &user, int &fg, StoryBoard &st
         return E2AUTH_NOMATCH;
     }
     cm.user = user;
+    std::string entry_function_name;
+    std::string entry_file_name;
+    unsigned int entry_index = story_entry >= 0 ? static_cast<unsigned int>(story_entry) : 0;
+    bool has_entry_info = story_entry >= 0 && story.getEntryDebugInfo(entry_index, entry_function_name, entry_file_name);
+    const char *function_label = (has_entry_info && !entry_function_name.empty()) ? entry_function_name.c_str() : "<desconhecido>";
+    const char *file_label = (has_entry_info && !entry_file_name.empty()) ? entry_file_name.c_str() : "<desconhecido>";
+    int fg_before_lookup = fg;
+    // [GROUPTRACE_DEBUG] Inicio da busca de grupo a partir do ConnectionHandler.
+    group_trace_debug_log("ConnectionHandler avaliara usuario '%s' usando entrada %d (funcao='%s', arquivo='%s', fg_atual=%d)",
+                          user.c_str(), story_entry, function_label, file_label, fg_before_lookup);
     if (!story.runFunctEntry(story_entry, cm)) {
 #ifdef E2DEBUG
         std::cerr << "User not in filter groups list for: icap " << std::endl;
 #endif
+        // [GROUPTRACE_DEBUG] Nenhum grupo encontrado pelo ConnectionHandler.
+        group_trace_debug_log("ConnectionHandler nao encontrou grupo para '%s' (entrada %d, funcao='%s', arquivo='%s')",
+                              user.c_str(), story_entry, function_label, file_label);
         return E2AUTH_NOGROUP;
     }
 
@@ -4648,5 +4661,8 @@ int ConnectionHandler::determineGroup(std::string &user, int &fg, StoryBoard &st
     std::cerr << "Group found for: " << user.c_str() << " in icap " << std::endl;
 #endif
     fg = cm.filtergroup;
+    // [GROUPTRACE_DEBUG] Grupo atribuido com sucesso no ConnectionHandler.
+    group_trace_debug_log("ConnectionHandler atribuiu grupo %d ao usuario '%s' (entrada %d, funcao='%s', arquivo='%s', fg_anterior=%d)",
+                          fg, user.c_str(), story_entry, function_label, file_label, fg_before_lookup);
     return E2AUTH_OK;
 }

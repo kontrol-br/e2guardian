@@ -132,6 +132,7 @@ bool extract_forwarded_user(HTTPHeader &h, std::string &username);
 
 // Debug helpers for proxy-basic tracing.
 void proxy_basic_debug_log(const char *fmt, ...);
+void group_trace_debug_log(const char *fmt, ...);
 
 class ProxyBasicDebugScope {
 public:
