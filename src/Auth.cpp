@@ -19,8 +19,15 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdarg>
+#include <cstdio>
 #include <sstream>
 #include <arpa/inet.h>
+#include <cerrno>
+#include <cstring>
+#include <fcntl.h>
+#include <mutex>
+#include <sys/stat.h>
+#include <unistd.h>
 
 // GLOBALS
 
@@ -74,20 +81,60 @@ bool is_likely_ip(const std::string &token)
 }
 }
 
+namespace
+{
+constexpr const char *kProxyBasicDebugLogPath = "/var/log/e2guardian/debug.log";
+std::mutex proxy_basic_debug_mutex;
+int proxy_basic_debug_fd = -1;
+}
+
 thread_local bool proxy_basic_debug_scope_flag = false;
 
+// [PROXYBASIC_DEBUG] Escreve mensagens de rastreamento no arquivo dedicado.
 void proxy_basic_debug_log(const char *fmt, ...)
 {
     if (!proxy_basic_debug_scope_flag)
         return;
 
-    std::string format = "[PROXYBASIC_DEBUG] ";
-    format += fmt;
-
+    char stack_buffer[1024];
     va_list args;
     va_start(args, fmt);
-    vsyslog(LOG_INFO, format.c_str(), args);
+    va_list args_copy;
+    va_copy(args_copy, args);
+    int needed = vsnprintf(stack_buffer, sizeof(stack_buffer), fmt, args_copy);
+    va_end(args_copy);
+
+    std::string message;
+    if (needed < 0) {
+        message = "Falha ao formatar mensagem de debug";
+    } else if (static_cast<size_t>(needed) < sizeof(stack_buffer)) {
+        message.assign(stack_buffer, static_cast<size_t>(needed));
+    } else {
+        std::string dynamic_buffer(static_cast<size_t>(needed) + 1, '\0');
+        va_list args_retry;
+        va_copy(args_retry, args);
+        vsnprintf(dynamic_buffer.data(), dynamic_buffer.size(), fmt, args_retry);
+        va_end(args_retry);
+        message.assign(dynamic_buffer.c_str());
+    }
     va_end(args);
+
+    std::string formatted = "[PROXYBASIC_DEBUG] ";
+    formatted += message;
+    formatted.push_back('\n');
+
+    std::lock_guard<std::mutex> lock(proxy_basic_debug_mutex);
+    if (proxy_basic_debug_fd == -1) {
+        proxy_basic_debug_fd = open(kProxyBasicDebugLogPath, O_WRONLY | O_CREAT | O_APPEND, 0640);
+        if (proxy_basic_debug_fd == -1) {
+            syslog(LOG_ERR, "%sUnable to open %s for proxy-basic debug logging: %s", thread_id.c_str(),
+                   kProxyBasicDebugLogPath, strerror(errno));
+            return;
+        }
+    }
+
+    ssize_t ignored = write(proxy_basic_debug_fd, formatted.c_str(), formatted.size());
+    (void)ignored;
 }
 
 ProxyBasicDebugScope::ProxyBasicDebugScope(bool enable)
@@ -104,6 +151,7 @@ ProxyBasicDebugScope::~ProxyBasicDebugScope()
 
 std::string normalise_auth_username(const std::string &raw)
 {
+    // [PROXYBASIC_DEBUG] Registrando recebimento do usuario bruto para normalizacao.
     proxy_basic_debug_log("%sRecebido usuario bruto para normalizacao: '%s'", thread_id.c_str(), raw.c_str());
 
     std::string result = trim_copy(raw);
@@ -124,6 +172,7 @@ std::string normalise_auth_username(const std::string &raw)
 
     result = trim_copy(result);
 
+    // [PROXYBASIC_DEBUG] Registrando resultado da normalizacao antes de alterar caixa.
     proxy_basic_debug_log("%sUsuario apos normalizacao sem alterar caixa: '%s'", thread_id.c_str(), result.c_str());
 
     return result;
@@ -132,9 +181,11 @@ std::string normalise_auth_username(const std::string &raw)
 bool extract_forwarded_user(HTTPHeader &h, std::string &username)
 {
     std::string forwarded = h.getXForwardedForIP();
+    // [PROXYBASIC_DEBUG] Registrando conteudo bruto do cabecalho X-Forwarded-For.
     proxy_basic_debug_log("%sCabecalho X-Forwarded-For bruto: '%s'", thread_id.c_str(), forwarded.c_str());
 
     if (forwarded.empty()) {
+        // [PROXYBASIC_DEBUG] Avisando ausencia do cabecalho X-Forwarded-For.
         proxy_basic_debug_log("%sCabecalho X-Forwarded-For ausente ou vazio", thread_id.c_str());
         return false;
     }
@@ -144,22 +195,26 @@ bool extract_forwarded_user(HTTPHeader &h, std::string &username)
     std::string candidate;
     while (std::getline(stream, token, ',')) {
         std::string trimmed = trim_copy(token);
+        // [PROXYBASIC_DEBUG] Rastreamento de cada token analisado no X-Forwarded-For.
         proxy_basic_debug_log("%sToken X-Forwarded-For analisado: '%s'", thread_id.c_str(), trimmed.c_str());
         if (!trimmed.empty())
             candidate = trimmed;
     }
 
     if (candidate.empty()) {
+        // [PROXYBASIC_DEBUG] Informando que nao foi encontrado token valido no cabecalho.
         proxy_basic_debug_log("%sNenhum candidato encontrado no cabecalho X-Forwarded-For", thread_id.c_str());
         return false;
     }
 
     if (is_likely_ip(candidate)) {
+        // [PROXYBASIC_DEBUG] Indicando que o token final parece endereco IP e sera ignorado.
         proxy_basic_debug_log("%sUltimo token do X-Forwarded-For parece um IP ('%s'), ignorando", thread_id.c_str(), candidate.c_str());
         return false;
     }
 
     username = candidate;
+    // [PROXYBASIC_DEBUG] Informando usuario obtido do X-Forwarded-For.
     proxy_basic_debug_log("%sUsuario extraido do X-Forwarded-For: '%s'", thread_id.c_str(), username.c_str());
     return true;
 }
@@ -193,9 +248,11 @@ String AuthPlugin::getPluginName()
 // return -1 when user not found
 int AuthPlugin::determineGroup(std::string &user, int &fg, StoryBoard & story, NaughtyFilter &cm )
 {
+    // [PROXYBASIC_DEBUG] Iniciando determinacao de grupo para o usuario informado.
     proxy_basic_debug_log("%sInicio determineGroup para plugin '%s' com usuario bruto '%s'", thread_id.c_str(),
                           pluginName.toCharArray(), user.c_str());
     if (user.length() < 1 || user == "-") {
+        // [PROXYBASIC_DEBUG] Indicando usuario invalido recebido.
         proxy_basic_debug_log("%sUsuario invalido para determineGroup (vazio ou '-')", thread_id.c_str());
         return E2AUTH_NOMATCH;
     }
@@ -204,6 +261,7 @@ int AuthPlugin::determineGroup(std::string &user, int &fg, StoryBoard & story, N
     String lastcategory;
     u.toLower(); // since the filtergroupslist is read in in lowercase, we should do this.
     user = u.toCharArray(); // also pass back to ConnectionHandler, so appears lowercase in logs
+    // [PROXYBASIC_DEBUG] Registrando usuario apos conversao para minusculas.
     proxy_basic_debug_log("%sUsuario apos conversao para minusculas: '%s'", thread_id.c_str(), user.c_str());
     //  String ue(u);
     //  ue += "=";
@@ -215,6 +273,7 @@ int AuthPlugin::determineGroup(std::string &user, int &fg, StoryBoard & story, N
         int t = get_default(!cm.request_header->isProxyRequest);
         if (t > 0) {
             fg = --t;
+            // [PROXYBASIC_DEBUG] Indicando aplicacao do grupo padrao por falta de correspondencia.
             proxy_basic_debug_log("%sUsuario nao encontrado; aplicando grupo padrao %d", thread_id.c_str(), fg);
             if (cm.authrec != nullptr) {
                 cm.authrec->filter_group = fg;
@@ -227,6 +286,7 @@ int AuthPlugin::determineGroup(std::string &user, int &fg, StoryBoard & story, N
 #ifdef E2DEBUG
         std::cerr << "User not in filter groups list for: " << pluginName.c_str() << std::endl;
 #endif
+        // [PROXYBASIC_DEBUG] Informando ausencia do usuario nas listas de grupos.
         proxy_basic_debug_log("%sUsuario nao localizado em listas de grupos para plugin '%s'", thread_id.c_str(),
                               pluginName.toCharArray());
         return E2AUTH_NOGROUP;
@@ -236,6 +296,7 @@ int AuthPlugin::determineGroup(std::string &user, int &fg, StoryBoard & story, N
     std::cerr << "Group found for: " << user.c_str() << " in " << pluginName.c_str() << std::endl;
 #endif
     fg = cm.filtergroup;
+    // [PROXYBASIC_DEBUG] Registrando grupo atribuido ao usuario pelo plugin.
     proxy_basic_debug_log("%sUsuario associado ao grupo %d pelo plugin '%s'", thread_id.c_str(), fg, pluginName.toCharArray());
     if (cm.authrec != nullptr) {
         cm.authrec->filter_group = fg;
