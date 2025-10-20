@@ -14,8 +14,11 @@
 
 #include "../Auth.hpp"
 #include "../OptionContainer.hpp"
+#include "../NaughtyFilter.hpp"
+#include "../StoryBoard.hpp"
 
 #include <syslog.h>
+#include <iostream>
 
 extern bool is_daemonised;
 extern OptionContainer o;
@@ -34,6 +37,7 @@ class pf_basic_instance : public AuthPlugin
         client_ip_based = false;
     };
     int identify(Socket &peercon, Socket &proxycon, HTTPHeader &h, std::string &string, bool &is_real_user, auth_rec &authrec);
+    int determineGroup(std::string &user, int &rfg, StoryBoard &story, NaughtyFilter &cm) override;
     int init(void *args);
 };
 
@@ -76,6 +80,52 @@ int pf_basic_instance::identify(Socket &peercon, Socket &proxycon, HTTPHeader &h
     }
 
     return E2AUTH_NOMATCH;
+}
+
+int pf_basic_instance::determineGroup(std::string &user, int &rfg, StoryBoard &story, NaughtyFilter &cm)
+{
+    if (user.length() < 1 || user == "-")
+        return E2AUTH_NOMATCH;
+
+    std::string normalised = normalise_auth_username(user);
+    if (normalised.empty())
+        return E2AUTH_NOMATCH;
+
+    String lowered(normalised.c_str());
+    lowered.toLower();
+    user = lowered.toCharArray();
+
+    cm.user = user;
+
+    if (!story.runFunctEntry(story_entry, cm)) {
+        int default_group = get_default(!cm.request_header->isProxyRequest);
+        if (default_group > 0) {
+            rfg = default_group - 1;
+            cm.filtergroup = rfg;
+            if (cm.authrec != nullptr) {
+                cm.authrec->group_source = cv["plugname"];
+                cm.authrec->filter_group = rfg;
+                if (cm.authrec->user_name.length() == 0)
+                    cm.authrec->user_name = user;
+            }
+            return E2AUTH_OK;
+        }
+#ifdef E2DEBUG
+        std::cerr << thread_id << "User not in filter groups list for: " << cv["plugname"].c_str() << std::endl;
+#endif
+        return E2AUTH_NOGROUP;
+    }
+
+    rfg = cm.filtergroup;
+    if (cm.authrec != nullptr) {
+        cm.authrec->group_source = cv["plugname"];
+        cm.authrec->filter_group = rfg;
+        if (cm.authrec->user_name.length() == 0)
+            cm.authrec->user_name = user;
+        cm.authrec->is_authed = true;
+    }
+
+    return E2AUTH_OK;
 }
 
 int pf_basic_instance::init(void *args)
