@@ -631,10 +631,8 @@ ConnectionHandler::connectUpstream(Socket &sock, NaughtyFilter &cm, int port = 0
                     lerr_mess = 201;
                 else
                     lerr_mess = 202;
-                                      o.proxy_ip.c_str(), o.proxy_port, rc);
                 continue;
             }
-                                  o.proxy_port);
             return rc;
         }
     }
@@ -4541,19 +4539,10 @@ int ConnectionHandler::determineGroup(std::string &user, int &fg, StoryBoard &st
         return E2AUTH_NOMATCH;
     }
     cm.user = user;
-    std::string entry_function_name;
-    std::string entry_file_name;
-    unsigned int entry_index = story_entry >= 0 ? static_cast<unsigned int>(story_entry) : 0;
-    bool has_entry_info = story_entry >= 0 && story.getEntryDebugInfo(entry_index, entry_function_name, entry_file_name);
-    const char *function_label = (has_entry_info && !entry_function_name.empty()) ? entry_function_name.c_str() : "<desconhecido>";
-    const char *file_label = (has_entry_info && !entry_file_name.empty()) ? entry_file_name.c_str() : "<desconhecido>";
-    int fg_before_lookup = fg;
-                          user.c_str(), story_entry, function_label, file_label, fg_before_lookup);
     if (!story.runFunctEntry(story_entry, cm)) {
 #ifdef E2DEBUG
         std::cerr << "User not in filter groups list for: icap " << std::endl;
 #endif
-                              user.c_str(), story_entry, function_label, file_label);
         return E2AUTH_NOGROUP;
     }
 
@@ -4561,6 +4550,5 @@ int ConnectionHandler::determineGroup(std::string &user, int &fg, StoryBoard &st
     std::cerr << "Group found for: " << user.c_str() << " in icap " << std::endl;
 #endif
     fg = cm.filtergroup;
-                          fg, user.c_str(), story_entry, function_label, file_label, fg_before_lookup);
     return E2AUTH_OK;
 }
