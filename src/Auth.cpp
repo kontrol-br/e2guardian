@@ -163,7 +163,12 @@ int AuthPlugin::determineGroup(std::string &user, int &fg, StoryBoard & story, N
         int t = get_default(!cm.request_header->isProxyRequest);
         if (t > 0) {
             fg = --t;
-            cm.authrec->group_source = "pdef";
+            if (cm.authrec != nullptr) {
+                cm.authrec->filter_group = fg;
+                cm.authrec->group_source = "pdef";
+                if (cm.authrec->user_name.length() == 0)
+                    cm.authrec->user_name = user;
+            }
             return E2AUTH_OK;
         }
 #ifdef E2DEBUG
@@ -176,6 +181,12 @@ int AuthPlugin::determineGroup(std::string &user, int &fg, StoryBoard & story, N
     std::cerr << "Group found for: " << user.c_str() << " in " << pluginName.c_str() << std::endl;
 #endif
     fg = cm.filtergroup;
+    if (cm.authrec != nullptr) {
+        cm.authrec->filter_group = fg;
+        if (cm.authrec->user_name.length() == 0)
+            cm.authrec->user_name = user;
+        cm.authrec->is_authed = true;
+    }
     return E2AUTH_OK;
 }
 
