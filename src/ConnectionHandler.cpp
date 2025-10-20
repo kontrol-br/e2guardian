@@ -60,32 +60,6 @@ extern std::atomic<bool> ttg;
 extern thread_local std::string thread_id;
 
 
-namespace {
-
-bool has_proxy_basic_plugin()
-{
-    for (auto it = o.authplugins_begin; it != o.authplugins_end; ++it) {
-        AuthPlugin *plugin = static_cast<AuthPlugin *>(*it);
-        if (plugin == nullptr)
-            continue;
-        String name = plugin->getPluginName();
-        if (name.startsWith("proxy-basic"))
-            return true;
-    }
-    return false;
-}
-
-bool is_proxy_basic_plugin(AuthPlugin *plugin)
-{
-    if (plugin == nullptr)
-        return false;
-    String name = plugin->getPluginName();
-    return name.startsWith("proxy-basic");
-}
-
-}
-
-
 // IMPLEMENTATION
 
 ConnectionHandler::ConnectionHandler()
@@ -529,18 +503,12 @@ ConnectionHandler::connectUpstream(Socket &sock, NaughtyFilter &cm, int port = 0
 
     sock.setTimeout(o.connect_timeout);
 
-    // [PROXYBASIC_DEBUG] Registrando tentativa inicial de conexao com o destino solicitado.
-    proxy_basic_debug_log("%sTentando conectar ao destino %s:%d (isdirect=%d)", thread_id.c_str(),
-                          cm.connect_site.toCharArray(), port, cm.isdirect);
 
     while (++retry < o.connect_retries) {
         lerr_mess = 0;
         if (retry > 0) {
             if (o.logconerror)
                 syslog(LOG_INFO, "%s retry %d to connect to %s", thread_id.c_str(), retry, cm.urldomain.c_str());
-            // [PROXYBASIC_DEBUG] Indicando nova tentativa de conexao apos falha anterior.
-            proxy_basic_debug_log("%sRe-tentativa %d para conectar ao destino %s:%d", thread_id.c_str(), retry,
-                                  cm.connect_site.toCharArray(), port);
             if (!sock.isTimedout())
                 usleep(1000);       // don't hammer upstream
         }
@@ -571,18 +539,11 @@ ConnectionHandler::connectUpstream(Socket &sock, NaughtyFilter &cm, int port = 0
 #ifdef E2DEBUG
                 std::cerr << thread_id << "Connecting to IP " << des_ip << " port " << port << std::endl;
 #endif
-                // [PROXYBASIC_DEBUG] Registrando conexao direta usando IP conhecido.
-                proxy_basic_debug_log("%sConectando diretamente para %s:%d", thread_id.c_str(), des_ip.toCharArray(), port);
                 int rc = sock.connect(des_ip, port);
                 if (rc < 0) {
                     lerr_mess = 203;
-                    // [PROXYBASIC_DEBUG] Avisando falha ao conectar diretamente ao destino.
-                    proxy_basic_debug_log("%sFalha ao conectar diretamente para %s:%d (rc=%d)", thread_id.c_str(),
-                                          des_ip.toCharArray(), port, rc);
                     continue;
                 }
-                // [PROXYBASIC_DEBUG] Informando sucesso na conexao direta ao destino.
-                proxy_basic_debug_log("%sConexao direta estabelecida com %s:%d", thread_id.c_str(), des_ip.toCharArray(), port);
                 return rc;
             } else {
                 //dns lookup
@@ -648,20 +609,14 @@ ConnectionHandler::connectUpstream(Socket &sock, NaughtyFilter &cm, int port = 0
                     std::cerr << thread_id << "Connecting to IP " << t << " port " <<
                     port << " after dns lookup" << std::endl;
 #endif
-                    // [PROXYBASIC_DEBUG] Registrando tentativa de conexao apos resolucao DNS.
-                    proxy_basic_debug_log("%sConectando para %s:%d apos DNS", thread_id.c_str(), t, port);
                     int rc = sock.connect(t, port);
                     if (rc == 0) {
                         freeaddrinfo(infoptr);
 #ifdef E2DEBUG
                         std::cerr << thread_id << "Got connection upfailure is " << cm.upfailure << std::endl;
 #endif
-                        // [PROXYBASIC_DEBUG] Informando que a conexao apos DNS foi estabelecida com sucesso.
-                        proxy_basic_debug_log("%sConexao estabelecida apos DNS para %s:%d", thread_id.c_str(), t, port);
                         return 0;
                     }
-                    // [PROXYBASIC_DEBUG] Avisando falha na conexao apos resolucao DNS.
-                    proxy_basic_debug_log("%sFalha ao conectar apos DNS para %s:%d (rc=%d)", thread_id.c_str(), t, port, rc);
                 }
                 freeaddrinfo(infoptr);
                 if (may_be_loop) break;
@@ -670,21 +625,15 @@ ConnectionHandler::connectUpstream(Socket &sock, NaughtyFilter &cm, int port = 0
             }
         } else {  //is via proxy
             sock.setTimeout(o.proxy_timeout);
-            // [PROXYBASIC_DEBUG] Registrando tentativa de conexao ao proxy pai configurado.
-            proxy_basic_debug_log("%sConectando ao proxy pai %s:%d", thread_id.c_str(), o.proxy_ip.c_str(), o.proxy_port);
             int rc = sock.connect(o.proxy_ip, o.proxy_port);
             if (rc < 0) {
                 if (sock.isTimedout())
                     lerr_mess = 201;
                 else
                     lerr_mess = 202;
-                // [PROXYBASIC_DEBUG] Avisando falha ao conectar ao proxy pai.
-                proxy_basic_debug_log("%sFalha ao conectar ao proxy pai %s:%d (rc=%d)", thread_id.c_str(),
                                       o.proxy_ip.c_str(), o.proxy_port, rc);
                 continue;
             }
-            // [PROXYBASIC_DEBUG] Informando que a conexao com o proxy pai foi estabelecida.
-            proxy_basic_debug_log("%sConexao estabelecida com proxy pai %s:%d", thread_id.c_str(), o.proxy_ip.c_str(),
                                   o.proxy_port);
             return rc;
         }
@@ -701,9 +650,6 @@ ConnectionHandler::connectUpstream(Socket &sock, NaughtyFilter &cm, int port = 0
     cm.blocktype = 3;
     cm.isexception = false;
     cm.isbypass = false;
-    // [PROXYBASIC_DEBUG] Registrando falha geral apos esgotar tentativas de conexao.
-    proxy_basic_debug_log("%sTodas as tentativas de saida falharam para %s:%d (codigo %d)", thread_id.c_str(),
-                          cm.connect_site.toCharArray(), port, lerr_mess);
     return -1;
 }
 
@@ -749,8 +695,6 @@ int ConnectionHandler::handleConnection(Socket &peerconn, String &ip, bool ismit
     struct timeval thestart;
     gettimeofday(&thestart, NULL);
 
-    ProxyBasicDebugScope proxy_basic_scope(has_proxy_basic_plugin());
-
     //peerconn.setTimeout(o.proxy_timeout);
     peerconn.setTimeout(o.pcon_timeout);
 
@@ -773,9 +717,6 @@ int ConnectionHandler::handleConnection(Socket &peerconn, String &ip, bool ismit
     std::deque<CSPlugin *> responsescanners;
 
     std::string clientip(ip.toCharArray()); // hold the clients ip
-    // [PROXYBASIC_DEBUG] Registrando chegada de nova conexao oriunda do cache-peer.
-    proxy_basic_debug_log("%sRecebida nova conexao do cache-peer %s (ismitm=%d)", thread_id.c_str(),
-                          clientip.c_str(), ismitm ? 1 : 0);
     header.setClientIP(ip);
 
     if (clienthost) delete clienthost;
@@ -849,8 +790,6 @@ int ConnectionHandler::handleConnection(Socket &peerconn, String &ip, bool ismit
             persistPeer = false;
         } else {
             ++dystat->reqs;
-            // [PROXYBASIC_DEBUG] Confirmando leitura do cabecalho HTTP da conexao.
-            proxy_basic_debug_log("%sCabecalho HTTP recebido da conexao do cache-peer", thread_id.c_str());
         }
         //
         // End of set-up section
@@ -929,16 +868,6 @@ int ConnectionHandler::handleConnection(Socket &peerconn, String &ip, bool ismit
 //
             // do this normalisation etc just the once at the start.
             checkme.setURL(ismitm);
-            String request_method(header.requestType());
-            // [PROXYBASIC_DEBUG] Resumindo metodo, URL e modo da requisicao recebida.
-            proxy_basic_debug_log("%sResumo da requisicao: metodo='%s' url='%s' proxy=%d", thread_id.c_str(),
-                                  request_method.toCharArray(), checkme.url.c_str(), header.isProxyRequest);
-            // [PROXYBASIC_DEBUG] Registrando credenciais brutas vindas do Proxy-Authorization.
-            proxy_basic_debug_log("%sCabecalho Proxy-Authorization bruto: '%s'", thread_id.c_str(),
-                                  header.getRawAuthData().c_str());
-            // [PROXYBASIC_DEBUG] Registrando informacoes recebidas no cabecalho X-Forwarded-For.
-            proxy_basic_debug_log("%sCabecalho X-Forwarded-For recebido: '%s'", thread_id.c_str(),
-                                  header.getXForwardedForIP().c_str());
 
             if(o.log_requests) {
                 std::string fnt;
@@ -3041,10 +2970,6 @@ bool ConnectionHandler::doAuth(int &rc, bool &authed, int &filtergroup, AuthPlug
             // Logic changed to allow auth scan with multiple ports as option to auth-port
             //       fixed mapping
             //
-            bool plugin_is_proxy_basic = is_proxy_basic_plugin(auth_plugin);
-            if (plugin_is_proxy_basic)
-                // [PROXYBASIC_DEBUG] Indicando que o plugin proxy-basic sera consultado para credenciais.
-                proxy_basic_debug_log("%sConsultando plugin proxy-basic para identificar usuario", thread_id.c_str());
 
             if (o.map_auth_to_ports) {
                 if (o.filter_ports.size() > 1) {
@@ -3065,9 +2990,6 @@ bool ConnectionHandler::doAuth(int &rc, bool &authed, int &filtergroup, AuthPlug
             }
 
             if (rc == E2AUTH_NOMATCH) {
-                if (plugin_is_proxy_basic)
-                    // [PROXYBASIC_DEBUG] Informando que nao foram encontradas credenciais nesta rodada.
-                    proxy_basic_debug_log("%sPlugin proxy-basic nao encontrou credenciais nesta tentativa", thread_id.c_str());
 #ifdef E2DEBUG
                 std::cerr << "Auth plugin did not find a match; querying remaining plugins" << std::endl;
 #endif
@@ -3094,34 +3016,20 @@ bool ConnectionHandler::doAuth(int &rc, bool &authed, int &filtergroup, AuthPlug
                 std::cerr << "Auth plugin  returned OK but no persist not setting persist auth" << std::endl;
 #endif
                 overide_persist = true;
-                if (plugin_is_proxy_basic)
-                    // [PROXYBASIC_DEBUG] Indicando autenticacao sem persistencia retornada pelo plugin.
-                    proxy_basic_debug_log("%sPlugin proxy-basic autenticou sem persistencia", thread_id.c_str());
             } else if (rc < 0) {
                 if (!is_daemonised)
                     std::cerr << thread_id << "Auth plugin returned error code: " << rc << std::endl;
                 syslog(LOG_ERR, "%sAuth plugin returned error code: %d", thread_id.c_str(), rc);
-                if (plugin_is_proxy_basic)
-                    // [PROXYBASIC_DEBUG] Registrando codigo de erro devolvido pelo plugin.
-                    proxy_basic_debug_log("%sPlugin proxy-basic retornou erro %d", thread_id.c_str(), rc);
                 dobreak = true;
                 break;
             }
 #ifdef E2DEBUG
             std::cerr << thread_id << " -Auth plugin found username " << clientuser << " (" << oldclientuser << "), now determining group" << std::endl;
 #endif
-            if (plugin_is_proxy_basic)
-                // [PROXYBASIC_DEBUG] Informando usuario retornado e inicio da determinacao de grupo.
-                proxy_basic_debug_log("%sPlugin proxy-basic retornou usuario '%s' (anterior '%s'); iniciando determineGroup",
-                                      thread_id.c_str(), clientuser.c_str(), oldclientuser.c_str());
             if (clientuser == oldclientuser) {
 #ifdef E2DEBUG
                 std::cerr << thread_id << " -Same user as last time, re-using old group no." << std::endl;
 #endif
-                if (plugin_is_proxy_basic)
-                    // [PROXYBASIC_DEBUG] Informando reaproveitamento do grupo anterior.
-                    proxy_basic_debug_log("%sPlugin proxy-basic indicou mesmo usuario anterior; reutilizando grupo %d",
-                                          thread_id.c_str(), oldfg);
                 authed = true;
                 filtergroup = oldfg;
                 break;
@@ -3132,10 +3040,6 @@ bool ConnectionHandler::doAuth(int &rc, bool &authed, int &filtergroup, AuthPlug
 #ifdef E2DEBUG
                 std::cerr << thread_id << "Auth plugin found username & group; not querying remaining plugins" << std::endl;
 #endif
-                if (plugin_is_proxy_basic)
-                    // [PROXYBASIC_DEBUG] Registrando associacao de grupo devolvida pelo plugin.
-                    proxy_basic_debug_log("%sPlugin proxy-basic associou usuario '%s' ao grupo %d", thread_id.c_str(),
-                                          clientuser.c_str(), filtergroup);
                 authed = true;
                 break;
             } else if (rc == E2AUTH_NOMATCH) {
@@ -4644,15 +4548,11 @@ int ConnectionHandler::determineGroup(std::string &user, int &fg, StoryBoard &st
     const char *function_label = (has_entry_info && !entry_function_name.empty()) ? entry_function_name.c_str() : "<desconhecido>";
     const char *file_label = (has_entry_info && !entry_file_name.empty()) ? entry_file_name.c_str() : "<desconhecido>";
     int fg_before_lookup = fg;
-    // [GROUPTRACE_DEBUG] Inicio da busca de grupo a partir do ConnectionHandler.
-    group_trace_debug_log("ConnectionHandler avaliara usuario '%s' usando entrada %d (funcao='%s', arquivo='%s', fg_atual=%d)",
                           user.c_str(), story_entry, function_label, file_label, fg_before_lookup);
     if (!story.runFunctEntry(story_entry, cm)) {
 #ifdef E2DEBUG
         std::cerr << "User not in filter groups list for: icap " << std::endl;
 #endif
-        // [GROUPTRACE_DEBUG] Nenhum grupo encontrado pelo ConnectionHandler.
-        group_trace_debug_log("ConnectionHandler nao encontrou grupo para '%s' (entrada %d, funcao='%s', arquivo='%s')",
                               user.c_str(), story_entry, function_label, file_label);
         return E2AUTH_NOGROUP;
     }
@@ -4661,8 +4561,6 @@ int ConnectionHandler::determineGroup(std::string &user, int &fg, StoryBoard &st
     std::cerr << "Group found for: " << user.c_str() << " in icap " << std::endl;
 #endif
     fg = cm.filtergroup;
-    // [GROUPTRACE_DEBUG] Grupo atribuido com sucesso no ConnectionHandler.
-    group_trace_debug_log("ConnectionHandler atribuiu grupo %d ao usuario '%s' (entrada %d, funcao='%s', arquivo='%s', fg_anterior=%d)",
                           fg, user.c_str(), story_entry, function_label, file_label, fg_before_lookup);
     return E2AUTH_OK;
 }
