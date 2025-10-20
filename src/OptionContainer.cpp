@@ -1005,6 +1005,62 @@ bool OptionContainer::read(std::string &filename, int type) {
         maplist_dq = findoptionM("maplist");
         ipmaplist_dq = findoptionM("ipmaplist");
 
+        // Ensure that default authentication maps are available even when
+        // older configuration files are missing the maplist directives.  The
+        // runtime expects these files to live under
+        // __CONFDIR__/lists/authplugins/ so we synthesise sensible defaults
+        // when they are not provided explicitly.
+        String authplugins_dir = __CONFDIR;
+        authplugins_dir += "/lists/authplugins";
+
+        bool has_defaultusermap = false;
+        bool has_portmap = false;
+        for (const auto &entry : maplist_dq) {
+            if (entry.contains("name=defaultusermap")) {
+                has_defaultusermap = true;
+            } else if (entry.contains("name=portmap")) {
+                has_portmap = true;
+            }
+            if (has_defaultusermap && has_portmap) {
+                break;
+            }
+        }
+
+        if (!has_defaultusermap) {
+            String entry = "name=defaultusermap,path=";
+            entry += authplugins_dir;
+            entry += "/filtergroupslist";
+            entry += ",listdir=";
+            entry += authplugins_dir;
+            maplist_dq.push_back(entry);
+        }
+
+        if (!has_portmap) {
+            String entry = "name=portmap,path=";
+            entry += authplugins_dir;
+            entry += "/portgroups";
+            entry += ",listdir=";
+            entry += authplugins_dir;
+            maplist_dq.push_back(entry);
+        }
+
+        bool has_ipmap = false;
+        for (const auto &entry : ipmaplist_dq) {
+            if (entry.contains("name=ipmap")) {
+                has_ipmap = true;
+                break;
+            }
+        }
+
+        if (!has_ipmap) {
+            String entry = "name=ipmap,path=";
+            entry += authplugins_dir;
+            entry += "/ipgroups";
+            entry += ",listdir=";
+            entry += authplugins_dir;
+            ipmaplist_dq.push_back(entry);
+        }
+
         if ((findoptionS("authrequiresuserande2roup") == "on") && (authplugins.size() > 1))
             auth_requires_user_and_group = true;
 

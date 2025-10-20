@@ -432,17 +432,18 @@ ipsitelist = 'name=nomitm,path=__LISTDIR__/nomitmsiteiplist'
 
 
 ## Auth mapping files - Map users (or client IPs) to filter groups
-## Note that from v5.4 lists used by auth plugins are defined here and 
-## not in auth *.conf files
+## Note that from v5.4 lists used by auth plugins are defined here and
+## not in auth *.conf files.  LISTDIR defaults to lists/common, so the
+## auth maps live one level up inside lists/authplugins.
 
 # Generic user to group mapping - used by default by basic, digest, ntlm, 
 # ident & icap plugins
-maplist = 'name=defaultusermap, path=__LISTDIR__/authplugins/filtergroupslist'
+maplist = 'name=defaultusermap, path=__LISTDIR__/../authplugins/filtergroupslist'
 # for ip auth
-ipmaplist = 'name=ipmap, path=__LISTDIR__/authplugins/ipgroups'
+ipmaplist = 'name=ipmap, path=__LISTDIR__/../authplugins/ipgroups'
 
 # for port auth
-maplist = 'name=portmap, path=__LISTDIR__/authplugins/portgroups'
+maplist = 'name=portmap, path=__LISTDIR__/../authplugins/portgroups'
 
 
 # If on a user without group is considered like unauthenfied
