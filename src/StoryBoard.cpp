@@ -48,13 +48,18 @@ int resolve_filter_group_from_label(const String &label)
     if (label.length() == 0)
         return 0;
 
+    std::shared_ptr<LOptionContainer> lists = o.currentLists();
+    int max_groups = o.numfg;
+    if (lists != nullptr)
+        max_groups = std::max(max_groups, lists->numfg);
+
     String trimmed(label);
     trimmed.removeWhiteSpace();
     if (trimmed.length() == 0)
         return 0;
 
     int numeric = trimmed.toInteger();
-    if (numeric >= 1 && numeric <= o.numfg)
+    if (numeric >= 1 && numeric <= max_groups)
         return numeric;
 
     String lowered(trimmed);
@@ -62,8 +67,11 @@ int resolve_filter_group_from_label(const String &label)
 
     if (lowered == "default" || lowered == "defaultgroup" || lowered == "defaultfiltergroup") {
         int default_group = 1;
-        if (o.default_fg >= 0 && o.default_fg < o.numfg)
-            default_group = o.default_fg + 1;
+        if (o.default_fg >= 0) {
+            int candidate = o.default_fg + 1;
+            if (candidate >= 1 && candidate <= max_groups)
+                default_group = candidate;
+        }
         return default_group;
     }
 
@@ -73,7 +81,7 @@ int resolve_filter_group_from_label(const String &label)
 
     String numeric_candidate(normalised.c_str());
     numeric = numeric_candidate.toInteger();
-    if (numeric >= 1 && numeric <= o.numfg)
+    if (numeric >= 1 && numeric <= max_groups)
         return numeric;
 
     std::string digits;
@@ -86,11 +94,10 @@ int resolve_filter_group_from_label(const String &label)
     if (!digits.empty()) {
         String digit_string(digits.c_str());
         numeric = digit_string.toInteger();
-        if (numeric >= 1 && numeric <= o.numfg)
+        if (numeric >= 1 && numeric <= max_groups)
             return numeric;
     }
 
-    std::shared_ptr<LOptionContainer> lists = o.currentLists();
     if (lists != nullptr) {
         for (int idx = 0; idx < lists->numfg; ++idx) {
             if (lists->fg == nullptr || lists->fg[idx] == nullptr)
