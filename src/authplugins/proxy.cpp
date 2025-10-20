@@ -51,15 +51,23 @@ int proxyinstance::identify(Socket &peercon, Socket &proxycon, HTTPHeader &h, st
     // don't match for non-basic auth types
     String t(h.getAuthType());
     t.toLower();
-    if (t == "basic") {
-        // extract username
-        string = h.getAuthData();
-        if (string.length() > 0) {
-            string.resize(string.find_first_of(':'));
-            authrec.user_name = string;
-            authrec.user_source = "proxy";
-            is_real_user = true;
-            return E2AUTH_OK;
+
+    std::string authdata = h.getAuthData();
+    if ((t == "basic") || (t.length() == 0)) {
+        // Proxy-Authorization headers forwarded by Squid via cache_peer may
+        // not be flagged internally as originating from a proxy.  In that
+        // situation we still want to honour the header so that the user can
+        // be mapped to the correct filter group.
+        if (!authdata.empty()) {
+            std::string::size_type separator = authdata.find(':');
+            if (separator != std::string::npos) {
+                // extract username
+                string = authdata.substr(0, separator);
+                authrec.user_name = string;
+                authrec.user_source = "proxy";
+                is_real_user = true;
+                return E2AUTH_OK;
+            }
         }
     }
 
