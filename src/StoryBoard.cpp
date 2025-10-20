@@ -20,6 +20,8 @@
 #include <cstdlib>
 #include <cstdio>
 #include <ctime>
+#include <cctype>
+#include <memory>
 #include <unistd.h>
 #include <iostream>
 #include <fstream>
@@ -37,6 +39,88 @@ extern thread_local std::string thread_id;
 // DEFINES
 
 //#define SBDEBUG
+
+namespace
+{
+
+int resolve_filter_group_from_label(const String &label)
+{
+    if (label.length() == 0)
+        return 0;
+
+    String trimmed(label);
+    trimmed.removeWhiteSpace();
+    if (trimmed.length() == 0)
+        return 0;
+
+    int numeric = trimmed.toInteger();
+    if (numeric >= 1 && numeric <= o.numfg)
+        return numeric;
+
+    String lowered(trimmed);
+    lowered.toLower();
+
+    if (lowered == "default" || lowered == "defaultgroup" || lowered == "defaultfiltergroup") {
+        int default_group = 1;
+        if (o.default_fg >= 0 && o.default_fg < o.numfg)
+            default_group = o.default_fg + 1;
+        return default_group;
+    }
+
+    std::string normalised = normalise_group_label(lowered);
+    if (normalised.empty())
+        return 0;
+
+    String numeric_candidate(normalised.c_str());
+    numeric = numeric_candidate.toInteger();
+    if (numeric >= 1 && numeric <= o.numfg)
+        return numeric;
+
+    std::string digits;
+    for (unsigned char ch : normalised) {
+        if (std::isdigit(ch))
+            digits.push_back(static_cast<char>(ch));
+        else if (!digits.empty())
+            break;
+    }
+    if (!digits.empty()) {
+        String digit_string(digits.c_str());
+        numeric = digit_string.toInteger();
+        if (numeric >= 1 && numeric <= o.numfg)
+            return numeric;
+    }
+
+    std::shared_ptr<LOptionContainer> lists = o.currentLists();
+    if (lists != nullptr) {
+        for (int idx = 0; idx < lists->numfg; ++idx) {
+            if (lists->fg == nullptr || lists->fg[idx] == nullptr)
+                continue;
+
+            String base_name;
+            if (!lists->fg[idx]->name.empty())
+                base_name = lists->fg[idx]->name.c_str();
+            else {
+                base_name = "group";
+                base_name += String(idx + 1);
+            }
+
+            std::string base_normalised = normalise_group_label(base_name);
+            if (!base_normalised.empty() && normalised == base_normalised)
+                return idx + 1;
+
+            if (base_name.contains(" ")) {
+                String first_token(base_name.before(" "));
+                std::string token_normalised = normalise_group_label(first_token);
+                if (!token_normalised.empty() && normalised == token_normalised)
+                    return idx + 1;
+            }
+        }
+    }
+
+    return 0;
+}
+
+} // namespace
 
 // Constructor - set default values
 StoryBoard::StoryBoard() {
@@ -826,14 +910,15 @@ bool StoryBoard::runFunct(unsigned int fID, NaughtyFilter &cm) {
                     break;
                 case SB_FUNC_SETGROUP:
                     action_return = false;
-                    if (cm.result.size() > 0) {
-                        int g = cm.result.toInteger();
+                    {
+                        int g = resolve_filter_group_from_label(cm.result);
                         if (g > 0 && g <= o.numfg) {
-                            cm.filtergroup = --g;
-                            cm.authrec->group_source = i->list_name;
+                            cm.filtergroup = g - 1;
+                            if (cm.authrec != nullptr)
+                                cm.authrec->group_source = i->list_name;
                             action_return = true;
                         }
-                    };
+                    }
                     break;
                 case SB_FUNC_UNSETVIRUSCHECK:
                     cm.noviruscheck = true;
