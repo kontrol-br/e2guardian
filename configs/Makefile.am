@@ -21,13 +21,14 @@ EXTRA_DIST = e2guardian.conf.in e2guardianf1.conf.in examplef1.story.in
 
 install-data-local:
 	$(MKDIR_P) $(DESTDIR)$(E2CONFDIR); \
+	$(MKDIR_P) $(DESTDIR)$(E2CONFDIR)/lists; \
+	$(MKDIR_P) $(DESTDIR)$(E2CONFDIR)/lists/authplugins; \
 	for l in $(FLISTS) ; do \
 	echo "$(INSTALL_DATA) $$l $(DESTDIR)$(E2CONFDIR)/$$l.sample"; \
 	$(INSTALL_DATA) $$l $(DESTDIR)$(E2CONFDIR)/$$l.sample; \
 	done
 
 install-data-hook:
-	$(MKDIR_P) $(DESTDIR)$(E2CONFDIR)/lists/authplugins; \
 	for l in $(AUTHPLUGIN_LISTS) ; do \
 	base=`basename $$l`; \
 	src="$(srcdir)/$$l"; \
