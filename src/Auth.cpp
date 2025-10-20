@@ -18,6 +18,7 @@
 #include <syslog.h>
 #include <algorithm>
 #include <cctype>
+#include <cstdarg>
 #include <sstream>
 #include <arpa/inet.h>
 
@@ -73,8 +74,38 @@ bool is_likely_ip(const std::string &token)
 }
 }
 
+thread_local bool proxy_basic_debug_scope_flag = false;
+
+void proxy_basic_debug_log(const char *fmt, ...)
+{
+    if (!proxy_basic_debug_scope_flag)
+        return;
+
+    std::string format = "[PROXYBASIC_DEBUG] ";
+    format += fmt;
+
+    va_list args;
+    va_start(args, fmt);
+    vsyslog(LOG_INFO, format.c_str(), args);
+    va_end(args);
+}
+
+ProxyBasicDebugScope::ProxyBasicDebugScope(bool enable)
+    : previous_(proxy_basic_debug_scope_flag)
+{
+    if (enable)
+        proxy_basic_debug_scope_flag = true;
+}
+
+ProxyBasicDebugScope::~ProxyBasicDebugScope()
+{
+    proxy_basic_debug_scope_flag = previous_;
+}
+
 std::string normalise_auth_username(const std::string &raw)
 {
+    proxy_basic_debug_log("%sRecebido usuario bruto para normalizacao: '%s'", thread_id.c_str(), raw.c_str());
+
     std::string result = trim_copy(raw);
     if (result.empty())
         return result;
@@ -91,28 +122,45 @@ std::string normalise_auth_username(const std::string &raw)
     if (result.size() > 1 && ((result.front() == '"' && result.back() == '"') || (result.front() == '\'' && result.back() == '\'')))
         result = result.substr(1, result.size() - 2);
 
-    return trim_copy(result);
+    result = trim_copy(result);
+
+    proxy_basic_debug_log("%sUsuario apos normalizacao sem alterar caixa: '%s'", thread_id.c_str(), result.c_str());
+
+    return result;
 }
 
 bool extract_forwarded_user(HTTPHeader &h, std::string &username)
 {
     std::string forwarded = h.getXForwardedForIP();
-    if (forwarded.empty())
+    proxy_basic_debug_log("%sCabecalho X-Forwarded-For bruto: '%s'", thread_id.c_str(), forwarded.c_str());
+
+    if (forwarded.empty()) {
+        proxy_basic_debug_log("%sCabecalho X-Forwarded-For ausente ou vazio", thread_id.c_str());
         return false;
+    }
 
     std::stringstream stream(forwarded);
     std::string token;
     std::string candidate;
     while (std::getline(stream, token, ',')) {
         std::string trimmed = trim_copy(token);
+        proxy_basic_debug_log("%sToken X-Forwarded-For analisado: '%s'", thread_id.c_str(), trimmed.c_str());
         if (!trimmed.empty())
             candidate = trimmed;
     }
 
-    if (candidate.empty() || is_likely_ip(candidate))
+    if (candidate.empty()) {
+        proxy_basic_debug_log("%sNenhum candidato encontrado no cabecalho X-Forwarded-For", thread_id.c_str());
         return false;
+    }
+
+    if (is_likely_ip(candidate)) {
+        proxy_basic_debug_log("%sUltimo token do X-Forwarded-For parece um IP ('%s'), ignorando", thread_id.c_str(), candidate.c_str());
+        return false;
+    }
 
     username = candidate;
+    proxy_basic_debug_log("%sUsuario extraido do X-Forwarded-For: '%s'", thread_id.c_str(), username.c_str());
     return true;
 }
 
@@ -145,7 +193,10 @@ String AuthPlugin::getPluginName()
 // return -1 when user not found
 int AuthPlugin::determineGroup(std::string &user, int &fg, StoryBoard & story, NaughtyFilter &cm )
 {
+    proxy_basic_debug_log("%sInicio determineGroup para plugin '%s' com usuario bruto '%s'", thread_id.c_str(),
+                          pluginName.toCharArray(), user.c_str());
     if (user.length() < 1 || user == "-") {
+        proxy_basic_debug_log("%sUsuario invalido para determineGroup (vazio ou '-')", thread_id.c_str());
         return E2AUTH_NOMATCH;
     }
     user = normalise_auth_username(user);
@@ -153,6 +204,7 @@ int AuthPlugin::determineGroup(std::string &user, int &fg, StoryBoard & story, N
     String lastcategory;
     u.toLower(); // since the filtergroupslist is read in in lowercase, we should do this.
     user = u.toCharArray(); // also pass back to ConnectionHandler, so appears lowercase in logs
+    proxy_basic_debug_log("%sUsuario apos conversao para minusculas: '%s'", thread_id.c_str(), user.c_str());
     //  String ue(u);
     //  ue += "=";
 
@@ -163,6 +215,7 @@ int AuthPlugin::determineGroup(std::string &user, int &fg, StoryBoard & story, N
         int t = get_default(!cm.request_header->isProxyRequest);
         if (t > 0) {
             fg = --t;
+            proxy_basic_debug_log("%sUsuario nao encontrado; aplicando grupo padrao %d", thread_id.c_str(), fg);
             if (cm.authrec != nullptr) {
                 cm.authrec->filter_group = fg;
                 cm.authrec->group_source = "pdef";
@@ -174,6 +227,8 @@ int AuthPlugin::determineGroup(std::string &user, int &fg, StoryBoard & story, N
 #ifdef E2DEBUG
         std::cerr << "User not in filter groups list for: " << pluginName.c_str() << std::endl;
 #endif
+        proxy_basic_debug_log("%sUsuario nao localizado em listas de grupos para plugin '%s'", thread_id.c_str(),
+                              pluginName.toCharArray());
         return E2AUTH_NOGROUP;
     }
 
@@ -181,6 +236,7 @@ int AuthPlugin::determineGroup(std::string &user, int &fg, StoryBoard & story, N
     std::cerr << "Group found for: " << user.c_str() << " in " << pluginName.c_str() << std::endl;
 #endif
     fg = cm.filtergroup;
+    proxy_basic_debug_log("%sUsuario associado ao grupo %d pelo plugin '%s'", thread_id.c_str(), fg, pluginName.toCharArray());
     if (cm.authrec != nullptr) {
         cm.authrec->filter_group = fg;
         if (cm.authrec->user_name.length() == 0)
