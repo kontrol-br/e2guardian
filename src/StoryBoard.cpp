@@ -13,6 +13,7 @@
 #include <syslog.h>
 #include <algorithm>
 #include <netdb.h> // for gethostby
+#include <string>
 #include "ListContainer.hpp"
 #include "StoryBoard.hpp"
 #include "OptionContainer.hpp"
@@ -1027,6 +1028,37 @@ bool StoryBoard::runFunctEntry(unsigned int index, NaughtyFilter &cm) {
     else
         return false;
 };
+
+bool StoryBoard::getEntryDebugInfo(unsigned int index, std::string &function_name, std::string &file_name) const {
+    function_name.clear();
+    file_name.clear();
+
+    constexpr unsigned int entry_count = sizeof(entrys) / sizeof(entrys[0]);
+    if (index >= entry_count)
+        return false;
+
+    unsigned int entry_id = entrys[index];
+    if (entry_id == 0)
+        return false;
+
+    for (const auto &function : funct_vec) {
+        if (function.getId() == entry_id) {
+            function_name = function.getName().toCharArray();
+            String source_file = function.getFileName();
+            file_name = source_file.toCharArray();
+            return true;
+        }
+    }
+
+    if (entry_id > SB_BI_FUNC_BASE && !funct_vec.empty()) {
+        unsigned int temp_id = entry_id;
+        String builtin = funct_vec.front().getBIFunct(temp_id);
+        function_name = builtin.toCharArray();
+        return true;
+    }
+
+    return false;
+}
 
 std::deque<url_rec> StoryBoard::deep_urls(String &urld, NaughtyFilter &cm) {
     std::deque<url_rec> temp;

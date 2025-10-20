@@ -78,6 +78,7 @@ class StoryBoard
     //bool runFunctEntry1(NaughtyFilter &cm);
     //bool runFunctEntry2(NaughtyFilter &cm);
     bool runFunctEntry(unsigned int index,  NaughtyFilter &cm);
+    bool getEntryDebugInfo(unsigned int index, std::string &function_name, std::string &file_name) const;
     bool setEntry(unsigned int index, String fname);
     //bool setEntry1(String fname);
     //bool setEntry2(String fname);

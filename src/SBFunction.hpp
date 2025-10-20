@@ -211,9 +211,11 @@ class SBFunction
 	bool addline(String command, String params, String action, unsigned int line_no);
 	unsigned int getStateID(String & state);
     unsigned int getBIFunctID(String & action);
-    String getState(unsigned int id);
-	String getBIFunct(unsigned int &id);
-	String getName();
+    String getState(unsigned int id) const;
+    String getBIFunct(unsigned int &id) const;
+    String getName() const;
+    unsigned int getId() const;
+    String getFileName() const;
 
 
 };

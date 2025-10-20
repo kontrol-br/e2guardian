@@ -84,9 +84,24 @@ bool is_likely_ip(const std::string &token)
 
 namespace
 {
-constexpr const char *kProxyBasicDebugLogPath = "/var/log/e2guardian/debug.log";
-std::mutex proxy_basic_debug_mutex;
-int proxy_basic_debug_fd = -1;
+constexpr const char *kDebugLogPath = "/var/log/e2guardian/debug.log";
+std::mutex debug_log_mutex;
+int debug_log_fd = -1;
+
+void append_debug_log(const std::string &message)
+{
+    std::lock_guard<std::mutex> lock(debug_log_mutex);
+    if (debug_log_fd == -1) {
+        debug_log_fd = open(kDebugLogPath, O_WRONLY | O_CREAT | O_APPEND, 0640);
+        if (debug_log_fd == -1) {
+            syslog(LOG_ERR, "%sUnable to open %s for debug logging: %s", thread_id.c_str(), kDebugLogPath, strerror(errno));
+            return;
+        }
+    }
+
+    ssize_t ignored = write(debug_log_fd, message.c_str(), message.size());
+    (void)ignored;
+}
 }
 
 thread_local bool proxy_basic_debug_scope_flag = false;
@@ -124,18 +139,41 @@ void proxy_basic_debug_log(const char *fmt, ...)
     formatted += message;
     formatted.push_back('\n');
 
-    std::lock_guard<std::mutex> lock(proxy_basic_debug_mutex);
-    if (proxy_basic_debug_fd == -1) {
-        proxy_basic_debug_fd = open(kProxyBasicDebugLogPath, O_WRONLY | O_CREAT | O_APPEND, 0640);
-        if (proxy_basic_debug_fd == -1) {
-            syslog(LOG_ERR, "%sUnable to open %s for proxy-basic debug logging: %s", thread_id.c_str(),
-                   kProxyBasicDebugLogPath, strerror(errno));
-            return;
-        }
-    }
+    append_debug_log(formatted);
+}
 
-    ssize_t ignored = write(proxy_basic_debug_fd, formatted.c_str(), formatted.size());
-    (void)ignored;
+// [GROUPTRACE_DEBUG] Emite mensagens de rastreamento sobre atribuicao de grupos.
+void group_trace_debug_log(const char *fmt, ...)
+{
+    char stack_buffer[1024];
+    va_list args;
+    va_start(args, fmt);
+    va_list args_copy;
+    va_copy(args_copy, args);
+    int needed = vsnprintf(stack_buffer, sizeof(stack_buffer), fmt, args_copy);
+    va_end(args_copy);
+
+    std::string message;
+    if (needed < 0) {
+        message = "Falha ao formatar mensagem de rastreamento de grupos";
+    } else if (static_cast<size_t>(needed) < sizeof(stack_buffer)) {
+        message.assign(stack_buffer, static_cast<size_t>(needed));
+    } else {
+        std::vector<char> dynamic_buffer(static_cast<size_t>(needed) + 1, '\0');
+        va_list args_retry;
+        va_copy(args_retry, args);
+        vsnprintf(dynamic_buffer.data(), dynamic_buffer.size(), fmt, args_retry);
+        va_end(args_retry);
+        message.assign(dynamic_buffer.data());
+    }
+    va_end(args);
+
+    std::string tagged_message = std::string("[GROUPTRACE_DEBUG] ") + message;
+    std::string formatted = thread_id + tagged_message + '\n';
+    if (!is_daemonised) {
+        std::cerr << formatted << std::flush;
+    }
+    append_debug_log(formatted);
 }
 
 ProxyBasicDebugScope::ProxyBasicDebugScope(bool enable)
@@ -264,6 +302,16 @@ int AuthPlugin::determineGroup(std::string &user, int &fg, StoryBoard & story, N
     user = u.toCharArray(); // also pass back to ConnectionHandler, so appears lowercase in logs
     // [PROXYBASIC_DEBUG] Registrando usuario apos conversao para minusculas.
     proxy_basic_debug_log("%sUsuario apos conversao para minusculas: '%s'", thread_id.c_str(), user.c_str());
+    std::string entry_function_name;
+    std::string entry_file_name;
+    unsigned int entry_index = story_entry >= 0 ? static_cast<unsigned int>(story_entry) : 0;
+    bool has_entry_info = story_entry >= 0 && story.getEntryDebugInfo(entry_index, entry_function_name, entry_file_name);
+    const char *function_label = (has_entry_info && !entry_function_name.empty()) ? entry_function_name.c_str() : "<desconhecido>";
+    const char *file_label = (has_entry_info && !entry_file_name.empty()) ? entry_file_name.c_str() : "<desconhecido>";
+    int fg_before_lookup = fg;
+    // [GROUPTRACE_DEBUG] Inicio do rastreamento da determinacao de grupo.
+    group_trace_debug_log("Plugin '%s' avaliara usuario '%s' usando entrada %d (funcao='%s', arquivo='%s', fg_atual=%d)",
+                         pluginName.toCharArray(), user.c_str(), story_entry, function_label, file_label, fg_before_lookup);
     //  String ue(u);
     //  ue += "=";
 
@@ -276,6 +324,9 @@ int AuthPlugin::determineGroup(std::string &user, int &fg, StoryBoard & story, N
             fg = --t;
             // [PROXYBASIC_DEBUG] Indicando aplicacao do grupo padrao por falta de correspondencia.
             proxy_basic_debug_log("%sUsuario nao encontrado; aplicando grupo padrao %d", thread_id.c_str(), fg);
+            // [GROUPTRACE_DEBUG] Nenhuma correspondencia encontrada; aplicando grupo padrao.
+            group_trace_debug_log("Plugin '%s' nao encontrou grupo para '%s' (entrada %d, funcao='%s', arquivo='%s'); usando padrao=%d",
+                                  pluginName.toCharArray(), user.c_str(), story_entry, function_label, file_label, fg);
             if (cm.authrec != nullptr) {
                 cm.authrec->filter_group = fg;
                 cm.authrec->group_source = "pdef";
@@ -290,6 +341,9 @@ int AuthPlugin::determineGroup(std::string &user, int &fg, StoryBoard & story, N
         // [PROXYBASIC_DEBUG] Informando ausencia do usuario nas listas de grupos.
         proxy_basic_debug_log("%sUsuario nao localizado em listas de grupos para plugin '%s'", thread_id.c_str(),
                               pluginName.toCharArray());
+        // [GROUPTRACE_DEBUG] Falha ao localizar grupo sem padrao configurado.
+        group_trace_debug_log("Plugin '%s' nao encontrou grupo para '%s' e nao ha padrao configurado (entrada %d, funcao='%s', arquivo='%s')",
+                              pluginName.toCharArray(), user.c_str(), story_entry, function_label, file_label);
         return E2AUTH_NOGROUP;
     }
 
@@ -299,6 +353,9 @@ int AuthPlugin::determineGroup(std::string &user, int &fg, StoryBoard & story, N
     fg = cm.filtergroup;
     // [PROXYBASIC_DEBUG] Registrando grupo atribuido ao usuario pelo plugin.
     proxy_basic_debug_log("%sUsuario associado ao grupo %d pelo plugin '%s'", thread_id.c_str(), fg, pluginName.toCharArray());
+    // [GROUPTRACE_DEBUG] Grupo encontrado com sucesso.
+    group_trace_debug_log("Plugin '%s' atribuiu grupo %d ao usuario '%s' (entrada %d, funcao='%s', arquivo='%s', fg_anterior=%d)",
+                          pluginName.toCharArray(), fg, user.c_str(), story_entry, function_label, file_label, fg_before_lookup);
     if (cm.authrec != nullptr) {
         cm.authrec->filter_group = fg;
         if (cm.authrec->user_name.length() == 0)
