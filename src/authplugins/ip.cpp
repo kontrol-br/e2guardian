@@ -234,6 +234,53 @@ bool copy_file(const std::string &source, const std::string &destination)
     out << in.rdbuf();
     return out.good();
 }
+
+std::string trim_copy(const std::string &value)
+{
+    std::string::size_type start = 0;
+    std::string::size_type end = value.size();
+
+    while (start < end && std::isspace(static_cast<unsigned char>(value[start])))
+        ++start;
+
+    while (end > start && std::isspace(static_cast<unsigned char>(value[end - 1])))
+        --end;
+
+    return value.substr(start, end - start);
+}
+
+std::string normalise_forwarded_ip(const std::string &value)
+{
+    if (value.empty())
+        return value;
+
+    std::string first = value;
+    std::string::size_type comma = first.find(',');
+    if (comma != std::string::npos)
+        first = first.substr(0, comma);
+
+    return trim_copy(first);
+}
+
+bool is_valid_ipv4_literal(const std::string &value)
+{
+    if (value.empty())
+        return false;
+
+    struct in_addr sin;
+    return inet_aton(value.c_str(), &sin) != 0;
+}
+
+std::string select_first_valid_ip(const std::vector<std::string> &candidates)
+{
+    for (const auto &candidate : candidates) {
+        std::string trimmed = trim_copy(candidate);
+        if (!trimmed.empty() && is_valid_ipv4_literal(trimmed))
+            return trimmed;
+    }
+
+    return "";
+}
 } // namespace
 
 // class factory code *MUST* be included in every plugin
@@ -428,25 +475,24 @@ int ipinstance::identify(Socket &peercon, Socket &proxycon, HTTPHeader &h, std::
             use_xforwardedfor = true;
         }
     }
+    std::vector<std::string> candidates;
+
     if (use_xforwardedfor == 1) {
-        // grab the X-Forwarded-For IP if available
-        string = h.getXForwardedForIP();
-        // or try the client IP from the header
-        if (string.length() == 0)
-            string = h.getClientIP();
-        // otherwise, grab the IP directly from the client connection
-        if (string.length() == 0)
-        	string = peercon.getPeerIP();
+        candidates.emplace_back(normalise_forwarded_ip(h.getXForwardedForIP()));
+        candidates.emplace_back(h.getClientIP());
     } else {
-        string = h.getClientIP();
-        // otherwise, grab the IP directly from the client connection
-        if (string.length() == 0)
-            string = peercon.getPeerIP();
+        candidates.emplace_back(h.getClientIP());
     }
-    if (string.length() == 0)
-        string = peercon.getPeerIP();
-    if (string.length() == 0)
+
+    std::string peer_ip = peercon.getPeerIP();
+    candidates.emplace_back(peer_ip);
+
+    string = select_first_valid_ip(candidates);
+    if (string.empty())
+        string = trim_copy(peer_ip);
+    if (string.empty())
         string = "-";
+
     authrec.user_name = string;
     authrec.user_source = "ip";
     is_real_user = true;
@@ -491,6 +537,7 @@ bool ipinstance::ensureIPGroupsLoadedLocked()
 
 int ipinstance::determineGroup(std::string &user, int &rfg, StoryBoard &story, NaughtyFilter &cm)
 {
+    user = trim_copy(user);
     struct in_addr sin;
     if (inet_aton(user.c_str(), &sin) == 0) {
         if (!is_daemonised)
