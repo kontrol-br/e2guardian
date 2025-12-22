@@ -21,6 +21,7 @@
 #include <syslog.h>
 #include <cerrno>
 #include <zlib.h>
+#include <vector>
 
 // GLOBALS
 extern OptionContainer o;
@@ -1823,7 +1824,7 @@ bool HTTPHeader::in(Socket *sock, bool allowpersistent)
 
     // the RFCs don't specify a max header line length so this should be
     // dynamic really.  Pointed out (well reminded actually) by Daniel Robbins
-    char buff[32768]; // setup a buffer to hold the incomming HTTP line
+    std::vector<char> buff(32768); // setup a buffer to hold the incomming HTTP line
     String line; // temp store to hold the line after processing
     line = "----"; // so we get past the first while
     bool firsttime = true;
@@ -1842,7 +1843,7 @@ bool HTTPHeader::in(Socket *sock, bool allowpersistent)
 #ifdef E2DEBUG
             std::cerr << thread_id << "header:in before getLine - timeout:" << timeout << " Line: " << __LINE__ << " Function: " << __func__ << std::endl;
 #endif
-            rc = sock->getLine(buff, 32768, timeout, firsttime ? honour_reloadconfig : false, NULL, &truncated);
+            rc = sock->getLine(buff.data(), buff.size(), timeout, firsttime ? honour_reloadconfig : false, NULL, &truncated);
 #ifdef E2DEBUG
             std::cerr << thread_id << "firstime: header:in after getLine " << " Line: " << __LINE__ << " Function: " << __func__ << std::endl;
 #endif
@@ -1858,7 +1859,7 @@ bool HTTPHeader::in(Socket *sock, bool allowpersistent)
         //rc = sock->getLine(buff, 32768, 100, firsttime ? honour_reloadconfig : false, NULL, &truncated);   // timeout reduced to 100ms for lines after first
         // this does not work for sites who are slow to send Content-Lenght so revert to standard
         // timeout
-            rc = sock->getLine(buff, 32768, timeout, firsttime ? honour_reloadconfig : false, NULL, &truncated);   // timeout reduced to 100ms for lines after first
+            rc = sock->getLine(buff.data(), buff.size(), timeout, firsttime ? honour_reloadconfig : false, NULL, &truncated);   // timeout reduced to 100ms for lines after first
             if (rc < 0 || truncated) {
                 ispersistent = false;
 #ifdef E2DEBUG
@@ -1885,7 +1886,7 @@ bool HTTPHeader::in(Socket *sock, bool allowpersistent)
         // getline will throw an exception if there is an error which will
         // only be caught by HandleConnection()       ?????????????????????
 
-        if (rc > 0 ) line = buff;
+        if (rc > 0 ) line = buff.data();
         else line = "";// convert the line to a String
 
         if(firsttime && is_response) {
