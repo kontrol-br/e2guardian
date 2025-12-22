@@ -21,6 +21,7 @@
 #include <string.h>
 #include <algorithm>
 #include <sys/select.h>
+#include <vector>
 
 #ifdef E2DEBUG
 #include <iostream>
@@ -51,12 +52,12 @@ bool FDTunnel::tunnel(Socket &sockfrom, Socket &sockto, bool twoway, off_t targe
     std::cout << thread_id << "tunnelling chunked data." << std::endl;
 #endif
         int maxlen = 32000;
-        char buff[32000];
+        std::vector<char> buff(maxlen);
         int timeout = sockfrom.getTimeout();
         int rd = 0;
         int total_rd = 0;
-        while ( (rd = sockfrom.readChunk(buff,maxlen,timeout)) > 0) {
-            sockto.writeChunk(buff, rd, timeout);
+        while ( (rd = sockfrom.readChunk(buff.data(),maxlen,timeout)) > 0) {
+            sockto.writeChunk(buff.data(), rd, timeout);
             total_rd += rd;
         }
         sockto.writeChunkTrailer(sockfrom.chunked_trailer);
@@ -110,7 +111,7 @@ bool FDTunnel::tunnel(Socket &sockfrom, Socket &sockto, bool twoway, off_t targe
     else
         twayfds[1].fd = fdto;
 
-    char buff[32768]; // buffer for the input
+    std::vector<char> buff(32768); // buffer for the input
     int timeout = 120000;    // should be made setable in conf files
 
     bool done = false; // so we get past the first while
@@ -150,13 +151,19 @@ bool FDTunnel::tunnel(Socket &sockfrom, Socket &sockto, bool twoway, off_t targe
 
             if (twayfds[0].revents & (POLLIN | POLLHUP))
             {
-                if (targetthroughput > -1)
+                if (targetthroughput > -1) {
                     // we have a target throughput - only read in the exact amount of data we've been told to
                     // plus 2 bytes to "solve" an IE post bug with multipart/form-data forms:
                     // adds an extra CRLF on certain requests, that it doesn't count in reported content-length
-                    rc = sockfrom.readFromSocket(buff, (((int)sizeof(buff) < ((targetthroughput - throughput) /*+2*/)) ? sizeof(buff) : (targetthroughput - throughput) /* + 2*/), 0, 0, false);
-                else
-                    rc = sockfrom.readFromSocket(buff, sizeof(buff), 0, 0, false);
+                    off_t remaining = targetthroughput - throughput;
+                    if (remaining < 0) {
+                        remaining = 0;
+                    }
+                    int readlen = static_cast<int>(std::min<off_t>(static_cast<off_t>(buff.size()), remaining /*+2*/));
+                    rc = sockfrom.readFromSocket(buff.data(), readlen, 0, 0, false);
+                } else {
+                    rc = sockfrom.readFromSocket(buff.data(), static_cast<int>(buff.size()), 0, 0, false);
+                }
 
                 // read as much as is available
                 if (rc < 0) {
@@ -176,7 +183,7 @@ bool FDTunnel::tunnel(Socket &sockfrom, Socket &sockto, bool twoway, off_t targe
 
                      if (tooutfds[0].revents & POLLOUT)
                         {
-                            if (!sockto.writeToSocket(buff, rc, 0, 0, false)) { // write data
+                            if (!sockto.writeToSocket(buff.data(), rc, 0, 0, false)) { // write data
                             break; // was an error writing
                             }
 #ifdef E2DEBUG
@@ -205,7 +212,7 @@ bool FDTunnel::tunnel(Socket &sockfrom, Socket &sockto, bool twoway, off_t targe
                 }
 
                 // read as much as is available
-                rc = sockto.readFromSocket(buff, sizeof(buff), 0, 0, false);
+                rc = sockto.readFromSocket(buff.data(), static_cast<int>(buff.size()), 0, 0, false);
 
                 if (rc < 0) {
                     break; // an error occurred so end the while()
@@ -220,7 +227,7 @@ bool FDTunnel::tunnel(Socket &sockfrom, Socket &sockto, bool twoway, off_t targe
 
                         if (fromoutfds[0].revents & POLLOUT)
                         {
-                        if (!sockfrom.writeToSocket(buff, rc, 0, 0, false)) { // write data
+                        if (!sockfrom.writeToSocket(buff.data(), rc, 0, 0, false)) { // write data
                             break; // was an error writing
                         }
                         done = false; // flag to say data still to be handled

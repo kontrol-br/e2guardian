@@ -21,6 +21,7 @@
 #include <cerrno>
 #include <unistd.h>
 #include <netinet/tcp.h>
+#include <vector>
 
 #ifdef __SSLMITM
 #include "openssl/x509v3.h"
@@ -1211,12 +1212,12 @@ int Socket::readChunk( char *buffin, int maxlen, int timeout){
 
     if(clen == 0) {
         chunked_trailer = "";
-        char trailer[32000];
+        std::vector<char> trailer(32000);
         int len = 3;
         while( len > 2) {
-            len = getLine(trailer, 31900, timeout);
+            len = getLine(trailer.data(), 31900, timeout);
             if (len > 2) {
-                chunked_trailer += trailer;
+                chunked_trailer += trailer.data();
                 chunked_trailer += "\n";
             }
         }
@@ -1251,11 +1252,11 @@ int Socket::readChunk( char *buffin, int maxlen, int timeout){
 
 int Socket::loopChunk(int timeout)    // reads chunks and sends back until 0 len chunk or timeout
 {
-    char buff[32000];
+    std::vector<char> buff(32000);
     int tot_size = 0;
     int csize = 1;
     while (csize > 0) {
-        csize = readChunk(buff,32000, timeout);
+        csize = readChunk(buff.data(),32000, timeout);
         if (csize == 0)     // end chunk
         {
             if (!writeChunkTrailer(chunked_trailer))
@@ -1271,7 +1272,7 @@ int Socket::loopChunk(int timeout)    // reads chunks and sends back until 0 len
 #endif
             return tot_size;
         }
-        if (!(csize > 0 && writeChunk(buff,csize,timeout))) {
+        if (!(csize > 0 && writeChunk(buff.data(),csize,timeout))) {
 #ifdef CHUNKDEBUG
             std::cerr << thread_id << "loopChunk - error" << std::endl;
 #endif
@@ -1285,11 +1286,11 @@ int Socket::loopChunk(int timeout)    // reads chunks and sends back until 0 len
 
 int Socket::drainChunk(int timeout)    // reads chunks until 0 len chunk or timeout
 {
-    char buff[32000];
+    std::vector<char> buff(32000);
     int tot_size = 0;
     int csize = 1;
     while (csize > 0) {
-        csize = readChunk(buff,32000, timeout);
+        csize = readChunk(buff.data(),32000, timeout);
         if (!(csize > -1 )) {
 #ifdef CHUNKDEBUG
             std::cerr << thread_id << "drainChunk - error" << std::endl;
