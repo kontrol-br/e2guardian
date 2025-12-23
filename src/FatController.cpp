@@ -31,9 +31,12 @@
 #include <memory>
 #include <vector>
 #include <atomic>
+#include <functional>
+#include <pthread.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/select.h>
+#include <cstring>
 
 //#ifdef ENABLE_SEGV_BACKTRACE
 //#include <execinfo.h>
@@ -132,6 +135,45 @@ std::atomic<int> reload_cnt;
 extern OptionContainer o;
 extern bool is_daemonised;
 extern thread_local std::string thread_id;
+
+namespace {
+
+constexpr size_t DEFAULT_THREAD_STACK_SIZE = 2 * 1024 * 1024; // 2MB to avoid stack overflows on FreeBSD defaults
+
+struct ThreadWrapperCtx {
+    std::function<void()> fn;
+};
+
+void *thread_trampoline(void *arg)
+{
+    std::unique_ptr<ThreadWrapperCtx> ctx(static_cast<ThreadWrapperCtx *>(arg));
+    ctx->fn();
+    return nullptr;
+}
+
+bool spawn_detached_thread(const std::function<void()> &fn, const char *desc)
+{
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    size_t stack_size = DEFAULT_THREAD_STACK_SIZE;
+    if (stack_size < PTHREAD_STACK_MIN) {
+        stack_size = PTHREAD_STACK_MIN;
+    }
+    pthread_attr_setstacksize(&attr, stack_size);
+    pthread_t tid;
+    ThreadWrapperCtx *ctx = new ThreadWrapperCtx{fn};
+    int rc = pthread_create(&tid, &attr, thread_trampoline, ctx);
+    pthread_attr_destroy(&attr);
+    if (rc != 0) {
+        syslog(LOG_ERR, "%sFailed to create %s thread: %s", thread_id.c_str(), desc, strerror(rc));
+        delete ctx;
+        return false;
+    }
+    pthread_detach(tid);
+    return true;
+}
+
+} // namespace
 
 void stat_rec::clear()
 {
@@ -1623,16 +1665,18 @@ int fc_controlit()   //
     // Threads are created for logger, a separate thread for each listening port
     // and an array of worker threads to deal with the work.
     if (!o.no_logger) {
-        std::thread log_thread(log_listener, o.log_location, false, o.log_syslog,o.log_Q);
-        log_thread.detach();
+        spawn_detached_thread([=]() {
+            log_listener(o.log_location, false, o.log_syslog, o.log_Q);
+        }, "logger");
 #ifdef E2DEBUG
     std::cerr << thread_id << "log_listener thread created" << std::endl;
 #endif
     }
 
     if(o.log_requests) {
-        std::thread RQlog_thread(log_listener, o.RQlog_location, true, false,o.RQlog_Q);
-        RQlog_thread.detach();
+        spawn_detached_thread([=]() {
+            log_listener(o.RQlog_location, true, false, o.RQlog_Q);
+        }, "request logger");
 #ifdef E2DEBUG
         std::cerr << thread_id << "RQlog_listener thread created" << std::endl;
 #endif
@@ -1681,29 +1725,22 @@ int fc_controlit()   //
     //
 
     // worker thread generation
-    std::vector <std::thread> http_wt;
-    http_wt.reserve(o.http_workers);
-
     int i;
     for (i = 0; i < o.http_workers; i++) {
-        http_wt.push_back(std::thread(handle_connections, i));
+        spawn_detached_thread([i]() {
+            handle_connections(i);
+        }, "http worker");
     }
-    for (auto &i : http_wt) {
-        i.detach();
-   }
 #ifdef E2DEBUG
     std::cerr << thread_id << "http_worker threads created" << std::endl;
 #endif
 
     //   set listener threads going
 
-    std::vector <std::thread> listen_threads;
-    listen_threads.reserve(serversocketcount);
     for (int i = 0; i < serversocketcount; i++) {
-        listen_threads.push_back(std::thread(accept_connections, i));
-    }
-    for (auto &i : listen_threads) {
-        i.detach();
+        spawn_detached_thread([i]() {
+            accept_connections(i);
+        }, "listener");
     }
 #ifdef E2DEBUG
     std::cerr << "listen  threads created" << std::endl;
