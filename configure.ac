@@ -332,6 +332,24 @@ LIBS="${LIBS} $lfslib"
 AC_MSG_RESULT(yes)
 ])
 
+AC_MSG_CHECKING([whether to install man pages])
+AC_ARG_ENABLE(
+man,
+[AS_HELP_STRING([--enable-man@<:@=yes@:>@], [Install manual pages])],
+[ if test "x$enableval" = "xno"; then
+AC_MSG_RESULT(no)
+enable_man=no
+else
+AC_MSG_RESULT(yes)
+enable_man=yes
+fi
+],
+[ # enable by default
+AC_MSG_RESULT(yes)
+enable_man=yes
+])
+AM_CONDITIONAL(ENABLE_MAN, test "x$enable_man" = "xyes")
+
 # determine whether or not "off_t" is simply a typedef of
 # "int", "unsigned int", "long", etc. - if it is, the String
 # class won't compile if its off_t constructor is defined,
