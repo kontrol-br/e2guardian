@@ -156,10 +156,24 @@ bool spawn_detached_thread(const std::function<void()> &fn, const char *desc)
     pthread_attr_t attr;
     pthread_attr_init(&attr);
     size_t stack_size = DEFAULT_THREAD_STACK_SIZE;
+    if (o.thread_stack_size > 0) {
+        stack_size = o.thread_stack_size;
+    }
     if (stack_size < PTHREAD_STACK_MIN) {
         stack_size = PTHREAD_STACK_MIN;
     }
-    pthread_attr_setstacksize(&attr, stack_size);
+    long page_size = sysconf(_SC_PAGESIZE);
+    if (page_size > 0) {
+        size_t page = static_cast<size_t>(page_size);
+        stack_size = ((stack_size + page - 1) / page) * page;
+    }
+    int stack_rc = pthread_attr_setstacksize(&attr, stack_size);
+    if (stack_rc != 0) {
+        syslog(LOG_ERR, "%sFailed to set %s thread stack size to %zu bytes: %s",
+               thread_id.c_str(), desc, stack_size, strerror(stack_rc));
+        pthread_attr_destroy(&attr);
+        return false;
+    }
     pthread_t tid;
     ThreadWrapperCtx *ctx = new ThreadWrapperCtx{fn};
     int rc = pthread_create(&tid, &attr, thread_trampoline, ctx);

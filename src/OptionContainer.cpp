@@ -411,6 +411,20 @@ bool OptionContainer::read(std::string &filename, int type) {
             return false;
         } // check its a reasonable value
 
+        if (findoptionS("threadstacksize").empty()) {
+            thread_stack_size = 0;
+        } else {
+            long int thread_stack_kib = findoptionI("threadstacksize");
+            if (!realitycheck(thread_stack_kib, 0, 0, "threadstacksize")) {
+                return false;
+            }
+            if (thread_stack_kib <= 0) {
+                thread_stack_size = 0;
+            } else {
+                thread_stack_size = static_cast<size_t>(thread_stack_kib) * 1024;
+            }
+        }
+
         monitor_helper = findoptionS("monitorhelper");
         if (monitor_helper == "") {
             monitor_helper_flag = false;
