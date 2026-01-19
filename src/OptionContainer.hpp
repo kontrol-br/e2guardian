@@ -81,6 +81,7 @@ class OptionContainer
     int phrase_filter_mode = 0;
     int preserve_case = 0;
     unsigned int max_header_lines = 0;
+    int max_header_line_length = 0;
     int default_fg = 0;
     int default_trans_fg = 0;
     int default_icap_fg = 0;
