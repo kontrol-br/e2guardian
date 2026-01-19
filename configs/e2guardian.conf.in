@@ -1020,6 +1020,12 @@ weightedphrasemode = 2
 # 10MB to 2MB (ulimit -s 2048)
 # default 500
 
+#threadstacksize = 0
+#
+# Stack size (in KiB) for each worker/listener/logger thread created by E2guardian.
+# Use this to mitigate stack overflows on systems with small default thread stacks.
+# Set to 0 to use the built-in default (currently 2048 KiB).
+
 #maxcontentfiltersize = 2048
 #
 # Max content filter size
