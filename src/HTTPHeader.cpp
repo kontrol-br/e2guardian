@@ -1824,7 +1824,7 @@ bool HTTPHeader::in(Socket *sock, bool allowpersistent)
 
     // the RFCs don't specify a max header line length so this should be
     // dynamic really.  Pointed out (well reminded actually) by Daniel Robbins
-    std::vector<char> buff(32768); // setup a buffer to hold the incomming HTTP line
+    std::vector<char> buff(static_cast<size_t>(o.max_header_line_length)); // setup a buffer to hold the incomming HTTP line
     String line; // temp store to hold the line after processing
     line = "----"; // so we get past the first while
     bool firsttime = true;
@@ -1848,6 +1848,9 @@ bool HTTPHeader::in(Socket *sock, bool allowpersistent)
             std::cerr << thread_id << "firstime: header:in after getLine " << " Line: " << __LINE__ << " Function: " << __func__ << std::endl;
 #endif
            if (rc < 0 || truncated) {
+                if (truncated && o.logconerror) {
+                    syslog(LOG_INFO, "header:line too long (max %d bytes), see maxheaderlinelength", o.max_header_line_length);
+                }
                 ispersistent = false;
 #ifdef E2DEBUG
                 std::cerr << thread_id << "firstime: header:in after getLine: rc: " << rc << " truncated: " << truncated  << " Line: " << __LINE__ << " Function: " << __func__ << std::endl;
@@ -1861,6 +1864,9 @@ bool HTTPHeader::in(Socket *sock, bool allowpersistent)
         // timeout
             rc = sock->getLine(buff.data(), buff.size(), timeout, firsttime ? honour_reloadconfig : false, NULL, &truncated);   // timeout reduced to 100ms for lines after first
             if (rc < 0 || truncated) {
+                if (truncated && o.logconerror) {
+                    syslog(LOG_INFO, "header:line too long (max %d bytes), see maxheaderlinelength", o.max_header_line_length);
+                }
                 ispersistent = false;
 #ifdef E2DEBUG
                 std::cerr << thread_id << "not firstime header:in after getLine: rc: " << rc << " truncated: " << truncated << " Line: " << __LINE__ << " Function: " << __func__ << std::endl;

@@ -356,6 +356,13 @@ bool OptionContainer::read(std::string &filename, int type) {
             return false;
         }
 
+        max_header_line_length = findoptionI("maxheaderlinelength");
+        if (max_header_line_length == 0)
+            max_header_line_length = 32768;
+        if (!realitycheck(max_header_line_length, 4096, 16777216, "maxheaderlinelength")) {
+            return false;
+        }
+
 
         max_logitem_length = findoptionI("maxlogitemlength");
         // default of unlimited no longer allowed as could cause buffer overflow

@@ -817,6 +817,13 @@ usexforwardedfor = off
 # Minimum 10 max 2500
 # default 50
 
+# maxheaderlinelength = 32768
+#
+# Limit maximum length of any individual HTTP/ICAP header line (including the request line).
+# Increase this if very long URLs cause truncated header reads.
+# Minimum 4096 max 16777216
+# default 32768
+
 ###
 ### END of HEADER section
 

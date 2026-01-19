@@ -1440,6 +1440,8 @@ void accept_connections(int index) // thread to listen on a single listening soc
         };
         if (!ttg) syslog(LOG_ERR, "%sError count on accept exceeds 30", thread_id.c_str());
         serversockets[index]->close();
+    } catch (const std::exception &ex) {
+       syslog(LOG_ERR, "%slistener thread caught unexpected exception exiting: %s", thread_id.c_str(), ex.what());
     } catch (...) {
        syslog(LOG_ERR,"%slistener thread caught unexpected exception exiting", thread_id.c_str());
     }

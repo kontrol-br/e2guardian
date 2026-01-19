@@ -645,7 +645,7 @@ bool ICAPHeader::in(Socket *sock, bool allowpersistent)
 
     // the RFCs don't specify a max header line length so this should be
     // dynamic really.  Pointed out (well reminded actually) by Daniel Robbins
-    std::vector<char> buff(32768); // setup a buffer to hold the incomming ICAP line
+    std::vector<char> buff(static_cast<size_t>(o.max_header_line_length)); // setup a buffer to hold the incomming ICAP line
     String line; // temp store to hold the line after processing
     line = "----"; // so we get past the first while
     bool firsttime = true;
@@ -681,6 +681,9 @@ bool ICAPHeader::in(Socket *sock, bool allowpersistent)
 #endif
             if (rc == 0) return false;
             if (rc < 0 || truncated) {
+                if (truncated && o.logconerror) {
+                    syslog(LOG_INFO, "%sICAP header:line too long (max %d bytes), see maxheaderlinelength", thread_id.c_str(), o.max_header_line_length);
+                }
                 ispersistent = false;
 #ifndef NEWDEBUG_OFF
                 if(o.myDebug->ICAP)
@@ -698,6 +701,9 @@ bool ICAPHeader::in(Socket *sock, bool allowpersistent)
                                &truncated);   // timeout reduced to 100ms for lines after first
             if (rc == 0) return false;
             if (rc < 0 || truncated) {
+                if (truncated && o.logconerror) {
+                    syslog(LOG_INFO, "%sICAP header:line too long (max %d bytes), see maxheaderlinelength", thread_id.c_str(), o.max_header_line_length);
+                }
                 ispersistent = false;
 #ifndef NEWDEBUG_OFF
                 if(o.myDebug->ICAP)
