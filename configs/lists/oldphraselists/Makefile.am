@@ -1,6 +1,7 @@
 DISTCLEANFILES = Makefile.in
 
 E2DATADIR = $(E2CONFDIR)/lists/oldphraselists
+LEGACYDATADIR = $(E2CONFDIR)/lists/phraselists
 PHRASELISTS = badwords chat drugadvocacy gambling games goodphrases \
 		googlesearches gore illegaldrugs intolerance legaldrugs \
 		malware news nudism peer2peer personals pornography \
@@ -11,10 +12,13 @@ PHRASELISTS = badwords chat drugadvocacy gambling games goodphrases \
 install-data-local: 
 	for l in $(PHRASELISTS); do \
 		$(mkinstalldirs) $(DESTDIR)$(E2DATADIR)/$$l && \
+		$(mkinstalldirs) $(DESTDIR)$(LEGACYDATADIR)/$$l && \
 		for f in $(srcdir)/$$l/weighted* $(srcdir)/$$l/exception* $(srcdir)/$$l/banned*; do \
 		   if test -f $$f ; then \
 			echo "$(INSTALL_DATA) $$f $(DESTDIR)$(E2DATADIR)/$$l"; \
 			$(INSTALL_DATA) $$f $(DESTDIR)$(E2DATADIR)/$$l; \
+			echo "$(INSTALL_DATA) $$f $(DESTDIR)$(LEGACYDATADIR)/$$l"; \
+			$(INSTALL_DATA) $$f $(DESTDIR)$(LEGACYDATADIR)/$$l; \
 	           fi \
 		done \
 	done

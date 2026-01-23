@@ -38,6 +38,10 @@ install-data-local:
 		echo "$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l"; \
 		$(INSTALL_DATA) $$l $(DESTDIR)$(E2DATADIR)/$$l; \
 	done
+	if test -f $(DESTDIR)$(E2DATADIR)/clamdscan.conf ; then \
+		echo "$(INSTALL_DATA) $(DESTDIR)$(E2DATADIR)/clamdscan.conf $(DESTDIR)$(E2DATADIR)/clamdscan.conf.sample"; \
+		$(INSTALL_DATA) $(DESTDIR)$(E2DATADIR)/clamdscan.conf $(DESTDIR)$(E2DATADIR)/clamdscan.conf.sample; \
+	fi
 
 
 uninstall-local:
