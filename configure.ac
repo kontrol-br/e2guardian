@@ -1,7 +1,7 @@
 # Autoconf script
 
 AC_PREREQ(2.63)
-AC_INIT([e2guardian],[5.5.9r])
+AC_INIT([e2guardian],[5.5.9_01])
 AM_INIT_AUTOMAKE([subdir-objects])
 AC_CONFIG_HEADERS([e2config.h])
 AC_CONFIG_MACRO_DIR([m4])
@@ -273,7 +273,7 @@ fi
 ]
 
 CXXFLAGS="${CXXFLAGS} -funsigned-char"
-  
+
 # ask user if they want large file support on 32 bit systems
 AC_MSG_CHECKING([for large file support])
 AC_ARG_ENABLE(
