@@ -108,6 +108,7 @@ AC_MSG_CHECKING(for backside with both hands)
 AC_MSG_RESULT(no)
 AC_MSG_CHECKING(build os)
 AC_CANONICAL_BUILD
+AC_CANONICAL_HOST
 AC_MSG_RESULT($build_os)
 
 AC_MSG_CHECKING(for debug_high option)
@@ -482,7 +483,9 @@ else
 	AC_MSG_RESULT(yes)
 	dnsauth=true
 	DNSAUTHSUPPORT=""
-	LIBS="${LIBS} -lresolv"
+	AC_SEARCH_LIBS([res_init], [resolv], [], [
+		AC_MSG_ERROR([Could not find res_init; required for DNS auth support])
+	])
 	AC_DEFINE([PRT_DNSAUTH],[],[Define to enable DNS auth plugin])
 fi],
 [
@@ -591,4 +594,3 @@ src/Makefile
 ])
 
 AC_OUTPUT
-
