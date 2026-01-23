@@ -7,6 +7,8 @@ set(CMAKE_CXX_FLAGS -DHAVE_CONFIG_H -D__LOGLOCATION -D__PIDDIR -D__PROXYUSER -D_
 include_directories(.)
 include_directories(src)
 
+option(ENABLE_CLAMD "Enable ClamD content scanner support" OFF)
+
 add_executable(v5_5
         src/authplugins/dnsauth.cpp
         src/authplugins/header.cpp
@@ -16,7 +18,6 @@ add_executable(v5_5
         src/authplugins/ProxyFirstBasic.cpp
         src/authplugins/BearerBasic.cpp
         src/contentscanners/avastdscan.cpp
-        src/contentscanners/clamdscan.cpp
         src/contentscanners/commandlinescan.cpp
         src/contentscanners/icapscan.cpp
         src/contentscanners/kavdscan.cpp
@@ -104,3 +105,8 @@ add_executable(v5_5
         src/UDSocket.hpp
         src/UrlRec.hpp
         e2config.h)
+
+if(ENABLE_CLAMD)
+        target_sources(v5_5 PRIVATE src/contentscanners/clamdscan.cpp)
+        target_compile_definitions(v5_5 PRIVATE ENABLE_CLAMD)
+endif()
