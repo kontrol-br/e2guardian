@@ -6,6 +6,7 @@ SUBDIRS = .
 
 WLISTS = authexceptioniplist \
 authexceptionsitelist \
+authexceptionsiteiplist \
 authexceptionurllist \
 bannedclientlist \
 bannediplist \
