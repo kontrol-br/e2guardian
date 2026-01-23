@@ -20,5 +20,5 @@ groupn		 - lists for group n
 oldphraselists	 - old style format phraselists
 phraselists	 - lists of phrases
 rooms      	 - location (ip) based block/allow
-
+bannedrooms	 - rooms explicitly blocked (one entry per line)
 
