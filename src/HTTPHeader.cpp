@@ -407,6 +407,9 @@ void HTTPHeader::makeTransparent(bool incoming)
 #ifdef E2DEBUG
     std::cerr << thread_id << "Making headers transparent" << " Line: " << __LINE__ << " Function: " << __func__ << std::endl;
 #endif
+    if (header.empty()) {
+        return;
+    }
     if (incoming) {
         // remove references to the proxy before sending to browser
         if (pproxyconnection != NULL) {
@@ -519,6 +522,9 @@ void HTTPHeader::removeEncoding(int newlen)
 // setURL Code originally from from Ton Gorter 2004
 void HTTPHeader::setURL(String &url)
 {
+    if (header.empty()) {
+        return;
+    }
     String hostname;
     bool https = (url.before("://") == "https");
     if(requestType() == "CONNECT"){
@@ -585,6 +591,9 @@ void HTTPHeader::setURL(String &url)
 
 void HTTPHeader::setConnect(String &con_site) {
     if (requestType() != "CONNECT") return;
+    if (header.empty()) {
+        return;
+    }
     header.front() = header.front().before(" ") + " " + con_site + ":" + String(port) + " " + header.front().after(" ").after(" ");
     //remove all other headers
     if (header.size() > 1) {
@@ -900,6 +909,9 @@ void HTTPHeader::dbshowheader(bool outgoing)
 // are case-insensitive. - Anonymous SF Poster, 2006-02-23
 void HTTPHeader::checkheader(bool allowpersistent)
 {
+    if (header.empty()) {
+        return;
+    }
     bool outgoing = !is_response;
 //    if (header.front().startsWith("HT")) {
 //        outgoing = false;
@@ -991,9 +1003,14 @@ void HTTPHeader::checkheader(bool allowpersistent)
     }
 }
 
+    if (header.empty()) {
+        return;
+    }
+
     //if its http1.1
     bool onepointone = false;
-    if (header.front().after("HTTP/").startsWith("1.1")) {
+    const String &firstline = header.front();
+    if (firstline.after("HTTP/").startsWith("1.1")) {
 #ifdef E2DEBUG
         std::cerr << thread_id << "CheckHeader: HTTP/1.1 detected" << " Line: " << __LINE__ << " Function: " << __func__ << std::endl;
 #endif
@@ -1001,7 +1018,7 @@ void HTTPHeader::checkheader(bool allowpersistent)
     }
 
     if (outgoing) {        // set request Type
-        requesttype = header.front().before(" ");
+        requesttype = firstline.before(" ");
         if (!requesttype.startsWith("P"))   // is not POST or PUT no body is allowed
         {
 #ifdef E2DEBUG
@@ -1009,12 +1026,12 @@ void HTTPHeader::checkheader(bool allowpersistent)
 #endif
             contentlength = 0;
         }
-        if(header.front().after(" ").startsWith("/"))
+        if(firstline.after(" ").startsWith("/"))
             isProxyRequest = false;
         else
             isProxyRequest = true;
     } else {                    // set status code
-        tp = header.front().after(" ").before(" ");
+        tp = firstline.after(" ").before(" ");
         tp.removeWhiteSpace();
         returncode = tp.toInteger();
         if ((returncode < 200) || (returncode == 204) || (returncode == 304))    // no content body allowed
@@ -1047,7 +1064,7 @@ void HTTPHeader::checkheader(bool allowpersistent)
     // directly to the external server, not a connection to the proxy, so it won't be re-used in the
     // manner expected by E2 and will result in waiting for time-outs.  Bug identified by Jason Deasi.
     bool isconnect = false;
-    if (outgoing && header.front()[0] == 'C') {
+    if (outgoing && firstline[0] == 'C') {
 #ifdef E2DEBUG
         std::cerr << thread_id << "CheckHeader: CONNECT request detected" << " Line: " << __LINE__ << " Function: " << __func__ << std::endl;
 #endif
@@ -1723,6 +1740,9 @@ bool HTTPHeader::out(Socket *peersock, Socket *sock, int sendflag, bool reconnec
                     return false;
                //     throw std::exception();
                 // include the first line on the retry
+                if (header.empty()) {
+                    return false;
+                }
                 l = header.front() + "\n" + l;
                 continue;
             }
@@ -1930,6 +1950,9 @@ bool HTTPHeader::in(Socket *sock, bool allowpersistent)
     }
 
     header.pop_back(); // remove the final blank line of a header
+    if (header.empty()) {
+        return false;
+    }
 #ifdef E2DEBUG
     std::cerr << thread_id << "header:size =  " << header.size() << std::endl;
     if (header.size() > 0)
