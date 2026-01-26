@@ -407,6 +407,9 @@ void HTTPHeader::makeTransparent(bool incoming)
 #ifdef E2DEBUG
     std::cerr << thread_id << "Making headers transparent" << " Line: " << __LINE__ << " Function: " << __func__ << std::endl;
 #endif
+    if (header.empty()) {
+        return;
+    }
     if (incoming) {
         // remove references to the proxy before sending to browser
         if (pproxyconnection != NULL) {
@@ -519,6 +522,9 @@ void HTTPHeader::removeEncoding(int newlen)
 // setURL Code originally from from Ton Gorter 2004
 void HTTPHeader::setURL(String &url)
 {
+    if (header.empty()) {
+        return;
+    }
     String hostname;
     bool https = (url.before("://") == "https");
     if(requestType() == "CONNECT"){
@@ -585,6 +591,9 @@ void HTTPHeader::setURL(String &url)
 
 void HTTPHeader::setConnect(String &con_site) {
     if (requestType() != "CONNECT") return;
+    if (header.empty()) {
+        return;
+    }
     header.front() = header.front().before(" ") + " " + con_site + ":" + String(port) + " " + header.front().after(" ").after(" ");
     //remove all other headers
     if (header.size() > 1) {
@@ -900,6 +909,9 @@ void HTTPHeader::dbshowheader(bool outgoing)
 // are case-insensitive. - Anonymous SF Poster, 2006-02-23
 void HTTPHeader::checkheader(bool allowpersistent)
 {
+    if (header.empty()) {
+        return;
+    }
     bool outgoing = !is_response;
 //    if (header.front().startsWith("HT")) {
 //        outgoing = false;
@@ -1723,6 +1735,9 @@ bool HTTPHeader::out(Socket *peersock, Socket *sock, int sendflag, bool reconnec
                     return false;
                //     throw std::exception();
                 // include the first line on the retry
+                if (header.empty()) {
+                    return false;
+                }
                 l = header.front() + "\n" + l;
                 continue;
             }
@@ -1930,6 +1945,9 @@ bool HTTPHeader::in(Socket *sock, bool allowpersistent)
     }
 
     header.pop_back(); // remove the final blank line of a header
+    if (header.empty()) {
+        return false;
+    }
 #ifdef E2DEBUG
     std::cerr << thread_id << "header:size =  " << header.size() << std::endl;
     if (header.size() > 0)
