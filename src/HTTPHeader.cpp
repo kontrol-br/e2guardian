@@ -407,6 +407,9 @@ void HTTPHeader::makeTransparent(bool incoming)
 #ifdef E2DEBUG
     std::cerr << thread_id << "Making headers transparent" << " Line: " << __LINE__ << " Function: " << __func__ << std::endl;
 #endif
+    if (header.empty()) {
+        return;
+    }
     if (incoming) {
         // remove references to the proxy before sending to browser
         if (pproxyconnection != NULL) {
@@ -519,6 +522,9 @@ void HTTPHeader::removeEncoding(int newlen)
 // setURL Code originally from from Ton Gorter 2004
 void HTTPHeader::setURL(String &url)
 {
+    if (header.empty()) {
+        return;
+    }
     String hostname;
     bool https = (url.before("://") == "https");
     if(requestType() == "CONNECT"){
@@ -584,6 +590,9 @@ void HTTPHeader::setURL(String &url)
 }
 
 void HTTPHeader::setConnect(String &con_site) {
+    if (header.empty()) {
+        return;
+    }
     if (requestType() != "CONNECT") return;
     header.front() = header.front().before(" ") + " " + con_site + ":" + String(port) + " " + header.front().after(" ").after(" ");
     //remove all other headers
@@ -991,6 +1000,10 @@ void HTTPHeader::checkheader(bool allowpersistent)
     }
 }
 
+    if (header.empty()) {
+        return false;
+    }
+
     //if its http1.1
     bool onepointone = false;
     if (header.front().after("HTTP/").startsWith("1.1")) {
@@ -1257,6 +1270,9 @@ String HTTPHeader::url()
 // Ernest W Lessenger
 void HTTPHeader::chopBypass(String url, bool infectionbypass)
 {
+    if (header.empty()) {
+        return;
+    }
     if (url.contains(infectionbypass ? "GIBYPASS=" : "GBYPASS=")) {
         if (url.contains(infectionbypass ? "?GIBYPASS=" : "?GBYPASS=")) {
             String bypass(url.after(infectionbypass ? "?GIBYPASS=" : "?GBYPASS="));
@@ -1272,6 +1288,9 @@ void HTTPHeader::chopBypass(String url, bool infectionbypass)
 // same for scan bypass
 void HTTPHeader::chopScanBypass(String url)
 {
+    if (header.empty()) {
+        return;
+    }
     if (url.contains("GSBYPASS=")) {
         if (url.contains("?GSBYPASS=")) {
             String bypass(url.after("?GSBYPASS="));
@@ -1930,6 +1949,12 @@ bool HTTPHeader::in(Socket *sock, bool allowpersistent)
     }
 
     header.pop_back(); // remove the final blank line of a header
+#ifdef E2DEBUG
+    std::cerr << thread_id << "header:size after pop_back = " << header.size() << std::endl;
+#endif
+    if (header.empty()) {
+        return false;
+    }
 #ifdef E2DEBUG
     std::cerr << thread_id << "header:size =  " << header.size() << std::endl;
     if (header.size() > 0)
