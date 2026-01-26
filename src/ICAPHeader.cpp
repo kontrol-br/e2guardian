@@ -138,7 +138,7 @@ String ICAPHeader::requestType()
 int ICAPHeader::returnCode()    // does not apply to ICAP ?  May do if we use for ICAP client
 {
     if (header.size() > 0) {
-        return header.front().after(" ").before(" ").toInteger();
+        return header[0].after(" ").before(" ").toInteger();
     }else {
         return 0;
     }
@@ -227,7 +227,7 @@ String ICAPHeader::getUrl()
     bool https = false;
     String hostname;
     String userpassword;
-    String answer(header.front().after(" "));
+    String answer(header[0].after(" "));
     answer.removeMultiChar(' ');
     if (answer.after(" ").startsWith("ICAP/")) {
         answer = answer.before(" ICAP/");
@@ -248,7 +248,7 @@ String ICAPHeader::getUrl()
                 hostname = "icap://" + hostname;
                 answer = hostname + answer;
             }
-            header.front() = requestType() + " " + answer + " ICAP/" + header.front().after(" ICAP/");
+            header[0] = requestType() + " " + answer + " ICAP/" + header[0].after(" ICAP/");
         } else { // must be in the form GET http://foo.bar:80/ HTML/1.0
             if (!answer.after("://").contains("/")) {
                 answer += "/"; // needed later on so correct host is extracted

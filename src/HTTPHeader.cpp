@@ -270,7 +270,7 @@ bool HTTPHeader::isRedirection()
     if (header.size() < 1) {
         return false;
     } // sometimes get called b 4 read
-    String answer(header.front().after(" ").before(" "));
+    String answer(header[0].after(" ").before(" "));
     if (answer[0] == '3' && answer.length() == 3) {
         return true;
     }
@@ -424,10 +424,10 @@ void HTTPHeader::makeTransparent(bool incoming)
             (*pproxyauthenticate) += temp;
         }
         if (returnCode() == 407) {
-            String temp = header.front().before(" ");
-            String temp2 = header.front().after(" ").after(" ");
-            header.front() = temp + " 401 ";
-            header.front() += temp2;
+            String temp = header[0].before(" ");
+            String temp2 = header[0].after(" ").after(" ");
+            header[0] = temp + " 401 ";
+            header[0] += temp2;
         }
     } else {
         // remove references to origin server before sending to proxy
@@ -549,15 +549,15 @@ void HTTPHeader::setURL(String &url)
     }
 
 #ifdef E2DEBUG
-    std::cerr << thread_id << "setURL: header.front() changed from: " << header.front() << " Line: " << __LINE__ << " Function: " << __func__ << std::endl;
+    std::cerr << thread_id << "setURL: header.front() changed from: " << header[0] << " Line: " << __LINE__ << " Function: " << __func__ << std::endl;
 #endif
-    if (https && header.front().startsWith("CONNECT"))
+    if (https && header[0].startsWith("CONNECT"))
         // Should take form of "CONNECT example.com:443 HTTP/1.0" for SSL
-        header.front() = header.front().before(" ") + " " + hostname + ":" + String(port) + " " + header.front().after(" ").after(" ");
+        header[0] = header[0].before(" ") + " " + hostname + ":" + String(port) + " " + header[0].after(" ").after(" ");
     else
-        header.front() = header.front().before(" ") + " " + url + " " + header.front().after(" ").after(" ");
+        header[0] = header[0].before(" ") + " " + url + " " + header[0].after(" ").after(" ");
 #ifdef E2DEBUG
-    std::cerr << thread_id << " to: " << header.front() << " Line: " << __LINE__ << " Function: " << __func__ << std::endl;
+    std::cerr << thread_id << " to: " << header[0] << " Line: " << __LINE__ << " Function: " << __func__ << std::endl;
 #endif
 
     if (phost != NULL) {
@@ -598,7 +598,7 @@ void HTTPHeader::setConnect(String &con_site) {
     if (header.empty()) {
         return;
     }
-    header.front() = header.front().before(" ") + " " + con_site + ":" + String(port) + " " + header.front().after(" ").after(" ");
+    header[0] = header[0].before(" ") + " " + con_site + ":" + String(port) + " " + header[0].after(" ").after(" ");
     //remove all other headers
     if (header.size() > 1) {
         header.erase(header.begin()+1, header.end());
@@ -840,7 +840,7 @@ void HTTPHeader::dbshowheader(String *url, const char *clientip)
         for (std::deque<String>::iterator i = header.begin(); i != header.end(); i++) {
             line = &(*i);
             String line2 = *line;
-            if (header.front().startsWith("HT")) {
+            if (header[0].startsWith("HT")) {
                 inout = "IN";
             } else {
                 inout = "OUT";
@@ -1170,7 +1170,7 @@ String HTTPHeader::getUrl(bool withport, bool isssl)
 
     String hostname;
     String userpassword;
-    String answer(header.front().after(" "));
+    String answer(header[0].after(" "));
     answer.removeMultiChar(' ');
     if (answer.after(" ").startsWith("HTTP/")) {
         answer = answer.before(" HTTP/");
@@ -1209,7 +1209,7 @@ String HTTPHeader::getUrl(bool withport, bool isssl)
                 answer = hostname + answer;
             }
             // Squid doesn't like requests in this format. Work around the fact.
-            header.front() = requestType() + " " + answer + " HTTP/" + header.front().after(" HTTP/");
+            header[0] = requestType() + " " + answer + " HTTP/" + header[0].after(" HTTP/");
         } else { // must be in the form GET http://foo.bar:80/ HTML/1.0
             if (!answer.after("://").contains("/")) {
                 answer += "/"; // needed later on so correct host is extracted
@@ -1284,10 +1284,10 @@ void HTTPHeader::chopBypass(String url, bool infectionbypass)
     if (url.contains(infectionbypass ? "GIBYPASS=" : "GBYPASS=")) {
         if (url.contains(infectionbypass ? "?GIBYPASS=" : "?GBYPASS=")) {
             String bypass(url.after(infectionbypass ? "?GIBYPASS=" : "?GBYPASS="));
-            header.front() = header.front().before(infectionbypass ? "?GIBYPASS=" : "?GBYPASS=") + header.front().after(bypass.toCharArray());
+            header[0] = header[0].before(infectionbypass ? "?GIBYPASS=" : "?GBYPASS=") + header[0].after(bypass.toCharArray());
         } else {
             String bypass(url.after(infectionbypass ? "&GIBYPASS=" : "&GBYPASS="));
-            header.front() = header.front().before(infectionbypass ? "&GIBYPASS=" : "&GBYPASS=") + header.front().after(bypass.toCharArray());
+            header[0] = header[0].before(infectionbypass ? "&GIBYPASS=" : "&GBYPASS=") + header[0].after(bypass.toCharArray());
         }
     }
     cachedurl = "";
@@ -1302,10 +1302,10 @@ void HTTPHeader::chopScanBypass(String url)
     if (url.contains("GSBYPASS=")) {
         if (url.contains("?GSBYPASS=")) {
             String bypass(url.after("?GSBYPASS="));
-            header.front() = header.front().before("?GSBYPASS=") + header.front().after(bypass.toCharArray());
+            header[0] = header[0].before("?GSBYPASS=") + header[0].after(bypass.toCharArray());
         } else {
             String bypass(url.after("&GSBYPASS="));
-            header.front() = header.front().before("&GSBYPASS=") + header.front().after(bypass.toCharArray());
+            header[0] = header[0].before("&GSBYPASS=") + header[0].after(bypass.toCharArray());
         }
     }
     cachedurl = "";
@@ -1643,7 +1643,7 @@ bool HTTPHeader::out(Socket *peersock, Socket *sock, int sendflag, bool reconnec
 
     if (sendflag == __E2HEADER_SENDALL || sendflag == __E2HEADER_SENDFIRSTLINE) {
         if (header.size() > 0) {
-            l = header.front() + "\n";
+            l = header[0] + "\n";
 
 #ifdef E2DEBUG
             if(is_response)  {
@@ -1662,7 +1662,7 @@ bool HTTPHeader::out(Socket *peersock, Socket *sock, int sendflag, bool reconnec
 #endif
 
             if (isdirect && !is_response) {
-                l = header.front().before(" ") + " /" + header.front().after("://").after("/").before(" ") + " HTTP/1.1\r\n";
+                l = header[0].before(" ") + " /" + header[0].after("://").after("/").before(" ") + " HTTP/1.1\r\n";
 #ifdef E2DEBUG
     std::cerr << thread_id << "request headerout (modified for direct):" << l << " Line: " << __LINE__ << " Function: " << __func__ << std::endl;
 #endif
@@ -1753,7 +1753,7 @@ bool HTTPHeader::out(Socket *peersock, Socket *sock, int sendflag, bool reconnec
                 if (header.empty()) {
                     return false;
                 }
-                l = header.front() + "\n" + l;
+                l = header[0] + "\n" + l;
                 continue;
             }
             //throw std::exception();
