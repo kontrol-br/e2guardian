@@ -763,12 +763,15 @@ int icapinstance::doScan(Socket &icapsock, HTTPHeader *docheader, const char *ob
                 if(o.myDebug->ICAPC)
                 {
                         std::ostringstream oss (std::ostringstream::out);
+                        const char *original_header_line = docheader->header.empty()
+                            ? "<header vazio>"
+                            : docheader->header[0].toCharArray();
                         oss << thread_id << "Comparing original return code to modified:" 
-                          << docheader->header.front() << std::endl
+                          << original_header_line << std::endl
                           << line << std::endl;
                         o.myDebug->Debug("ICAPC",oss.str());
                         std::cerr << thread_id <<  "Comparing original return code to modified:" 
-                          << docheader->header.front() << std::endl
+                          << original_header_line << std::endl
                           << line << std::endl;
                 }
 #endif
