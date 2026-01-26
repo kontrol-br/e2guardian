@@ -1007,12 +1007,12 @@ void HTTPHeader::checkheader(bool allowpersistent)
 }
 
     if (header.empty()) {
-        return false;
+        return;
     }
 
     //if its http1.1
     bool onepointone = false;
-    const String &firstline = header.front();
+    String firstline = header.front();
     if (firstline.after("HTTP/").startsWith("1.1")) {
 #ifdef E2DEBUG
         std::cerr << thread_id << "CheckHeader: HTTP/1.1 detected" << " Line: " << __LINE__ << " Function: " << __func__ << std::endl;

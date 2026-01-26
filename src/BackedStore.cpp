@@ -111,11 +111,13 @@ bool BackedStore::append(const char *data, size_t len)
 
             size_t bytes_written = 0;
             ssize_t rc = 0;
-            do {
-                rc = write(fd, &(rambuf.front()) + bytes_written, rambuf.size() - bytes_written);
-                if (rc > 0)
-                    bytes_written += rc;
-            } while (bytes_written < rambuf.size() && (rc > 0 || errno == EINTR));
+            if (!rambuf.empty()) {
+                do {
+                    rc = write(fd, &(rambuf.front()) + bytes_written, rambuf.size() - bytes_written);
+                    if (rc > 0)
+                        bytes_written += rc;
+                } while (bytes_written < rambuf.size() && (rc > 0 || errno == EINTR));
+            }
             if (rc < 0 && errno != EINTR) {
                 std::ostringstream ss;
                 ss << thread_id << "BackedStore could not dump RAM buffer to temp file: " << strerror(errno);
@@ -191,6 +193,9 @@ const char *BackedStore::getData() const
 #ifdef E2DEBUG
         std::cerr << thread_id << "BackedStore: returning pointer to RAM" << std::endl;
 #endif
+        if (rambuf.empty()) {
+            return "";
+        }
         return &(rambuf.front());
     } else {
 #ifdef E2DEBUG
@@ -268,7 +273,7 @@ std::string BackedStore::store(const char *prefix)
             if (rc > 0)
                 bytes_written += rc;
         } while (bytes_written < length && (rc > 0 || errno == EINTR));
-    } else {
+    } else if (!rambuf.empty()) {
         do {
             rc = write(storefd, &(rambuf.front()) + bytes_written, rambuf.size() - bytes_written);
             if (rc > 0)

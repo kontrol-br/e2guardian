@@ -128,6 +128,9 @@ void ICAPHeader::reset()
 // grab request type (REQMOD, RESPMOD, OPTIONS)
 String ICAPHeader::requestType()
 {
+    if (header.empty()) {
+        return "";
+    }
     return header.front().before(" ");
 }
 
