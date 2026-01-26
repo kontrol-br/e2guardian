@@ -21,6 +21,7 @@
 #include <syslog.h>
 #include <cerrno>
 #include <zlib.h>
+#include <stdexcept>
 #include <vector>
 
 // GLOBALS
