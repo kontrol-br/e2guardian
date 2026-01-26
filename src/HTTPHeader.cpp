@@ -900,6 +900,9 @@ void HTTPHeader::dbshowheader(bool outgoing)
 // are case-insensitive. - Anonymous SF Poster, 2006-02-23
 void HTTPHeader::checkheader(bool allowpersistent)
 {
+    if (header.empty()) {
+        return;
+    }
     bool outgoing = !is_response;
 //    if (header.front().startsWith("HT")) {
 //        outgoing = false;
@@ -1930,6 +1933,9 @@ bool HTTPHeader::in(Socket *sock, bool allowpersistent)
     }
 
     header.pop_back(); // remove the final blank line of a header
+    if (header.empty()) {
+        return false;
+    }
 #ifdef E2DEBUG
     std::cerr << thread_id << "header:size =  " << header.size() << std::endl;
     if (header.size() > 0)
