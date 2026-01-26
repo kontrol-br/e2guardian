@@ -21,6 +21,7 @@
 #include <syslog.h>
 #include <cerrno>
 #include <zlib.h>
+#include <stdexcept>
 #include <vector>
 
 // GLOBALS
@@ -1012,7 +1013,7 @@ void HTTPHeader::checkheader(bool allowpersistent)
 
     //if its http1.1
     bool onepointone = false;
-    String firstline = header[0];
+    String firstline = header.front();
     if (firstline.after("HTTP/").startsWith("1.1")) {
 #ifdef E2DEBUG
         std::cerr << thread_id << "CheckHeader: HTTP/1.1 detected" << " Line: " << __LINE__ << " Function: " << __func__ << std::endl;

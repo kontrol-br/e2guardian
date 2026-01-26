@@ -131,7 +131,7 @@ String ICAPHeader::requestType()
     if (header.empty()) {
         return "";
     }
-    return header[0].before(" ");
+    return header.front().before(" ");
 }
 
 // grab return code

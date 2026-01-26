@@ -765,7 +765,7 @@ int icapinstance::doScan(Socket &icapsock, HTTPHeader *docheader, const char *ob
                         std::ostringstream oss (std::ostringstream::out);
                         const char *original_header_line = docheader->header.empty()
                             ? "<header vazio>"
-                            : docheader->header[0].toCharArray();
+                            : docheader->header.front().toCharArray();
                         oss << thread_id << "Comparing original return code to modified:" 
                           << original_header_line << std::endl
                           << line << std::endl;
