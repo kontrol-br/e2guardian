@@ -1003,6 +1003,10 @@ void HTTPHeader::checkheader(bool allowpersistent)
     }
 }
 
+    if (header.empty()) {
+        return false;
+    }
+
     //if its http1.1
     bool onepointone = false;
     if (header.front().after("HTTP/").startsWith("1.1")) {
@@ -1945,6 +1949,12 @@ bool HTTPHeader::in(Socket *sock, bool allowpersistent)
     }
 
     header.pop_back(); // remove the final blank line of a header
+    if (header.empty()) {
+        return false;
+    }
+#ifdef E2DEBUG
+    std::cerr << thread_id << "header:size after pop_back = " << header.size() << std::endl;
+#endif
     if (header.empty()) {
         return false;
     }
