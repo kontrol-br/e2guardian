@@ -590,6 +590,9 @@ void HTTPHeader::setURL(String &url)
 }
 
 void HTTPHeader::setConnect(String &con_site) {
+    if (header.empty()) {
+        return;
+    }
     if (requestType() != "CONNECT") return;
     if (header.empty()) {
         return;
@@ -1004,7 +1007,7 @@ void HTTPHeader::checkheader(bool allowpersistent)
 }
 
     if (header.empty()) {
-        return;
+        return false;
     }
 
     //if its http1.1
@@ -1274,6 +1277,9 @@ String HTTPHeader::url()
 // Ernest W Lessenger
 void HTTPHeader::chopBypass(String url, bool infectionbypass)
 {
+    if (header.empty()) {
+        return;
+    }
     if (url.contains(infectionbypass ? "GIBYPASS=" : "GBYPASS=")) {
         if (url.contains(infectionbypass ? "?GIBYPASS=" : "?GBYPASS=")) {
             String bypass(url.after(infectionbypass ? "?GIBYPASS=" : "?GBYPASS="));
@@ -1289,6 +1295,9 @@ void HTTPHeader::chopBypass(String url, bool infectionbypass)
 // same for scan bypass
 void HTTPHeader::chopScanBypass(String url)
 {
+    if (header.empty()) {
+        return;
+    }
     if (url.contains("GSBYPASS=")) {
         if (url.contains("?GSBYPASS=")) {
             String bypass(url.after("?GSBYPASS="));
@@ -1950,6 +1959,12 @@ bool HTTPHeader::in(Socket *sock, bool allowpersistent)
     }
 
     header.pop_back(); // remove the final blank line of a header
+    if (header.empty()) {
+        return false;
+    }
+#ifdef E2DEBUG
+    std::cerr << thread_id << "header:size after pop_back = " << header.size() << std::endl;
+#endif
     if (header.empty()) {
         return false;
     }
