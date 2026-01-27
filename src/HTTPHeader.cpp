@@ -918,6 +918,10 @@ void HTTPHeader::checkheader(bool allowpersistent)
 {
     std::lock_guard<std::recursive_mutex> lock(header_mutex);
     if (header.empty()) {
+        if (o.logconerror) {
+            syslog(LOG_INFO, "checkheader called with empty header");
+        }
+        ispersistent = false;
         return;
     }
     String firstline = header.front();
