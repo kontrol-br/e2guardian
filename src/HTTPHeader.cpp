@@ -524,6 +524,7 @@ void HTTPHeader::removeEncoding(int newlen)
 // setURL Code originally from from Ton Gorter 2004
 void HTTPHeader::setURL(String &url)
 {
+    std::lock_guard<std::recursive_mutex> lock(header_mutex);
     if (header.empty()) {
         return;
     }
@@ -971,7 +972,7 @@ void HTTPHeader::checkheader(bool allowpersistent)
             pcontentdisposition = &(*i);
         } else if ((pproxyauthorization == NULL) && i->startsWithLower("proxy-authorization:")) {
             pproxyauthorization = &(*i);
-        } else if ((pauthorization = NULL) && i->startsWithLower("authorization:")) {
+        } else if ((pauthorization == NULL) && i->startsWithLower("authorization:")) {
             pauthorization = &(*i);
         } else if ((pproxyauthenticate == NULL) && i->startsWithLower("proxy-authenticate:")) {
             pproxyauthenticate = &(*i);
