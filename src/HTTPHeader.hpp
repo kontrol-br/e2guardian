@@ -17,6 +17,7 @@
 // INCLUDES
 
 #include <deque>
+#include <mutex>
 
 #include "String.hpp"
 //#include "DataBuffer.hpp"
@@ -214,6 +215,7 @@ class HTTPHeader
     };
 
        private:
+        mutable std::recursive_mutex header_mutex;
         // timeout for socket operations
         int timeout;
 
