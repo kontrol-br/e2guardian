@@ -42,6 +42,7 @@ void HTTPHeader::setTimeout(int t)
 // reset header object for future use
 void HTTPHeader::reset()
 {
+    std::lock_guard<std::recursive_mutex> lock(header_mutex);
     if (dirty) {
         header.clear();
         waspersistent = false;
@@ -591,6 +592,7 @@ void HTTPHeader::setURL(String &url)
 }
 
 void HTTPHeader::setConnect(String &con_site) {
+    std::lock_guard<std::recursive_mutex> lock(header_mutex);
     if (header.empty()) {
         return;
     }
@@ -913,9 +915,11 @@ void HTTPHeader::dbshowheader(bool outgoing)
 // are case-insensitive. - Anonymous SF Poster, 2006-02-23
 void HTTPHeader::checkheader(bool allowpersistent)
 {
+    std::lock_guard<std::recursive_mutex> lock(header_mutex);
     if (header.empty()) {
         return;
     }
+    String firstline = header.front();
     bool outgoing = !is_response;
 //    if (header.front().startsWith("HT")) {
 //        outgoing = false;
@@ -1007,13 +1011,8 @@ void HTTPHeader::checkheader(bool allowpersistent)
     }
 }
 
-    if (header.empty()) {
-        return;
-    }
-
     //if its http1.1
     bool onepointone = false;
-    String firstline = header.front();
     if (firstline.after("HTTP/").startsWith("1.1")) {
 #ifdef E2DEBUG
         std::cerr << thread_id << "CheckHeader: HTTP/1.1 detected" << " Line: " << __LINE__ << " Function: " << __func__ << std::endl;
@@ -1841,6 +1840,7 @@ bool HTTPHeader::in_handle_100(Socket *sock, bool allowpersistent, bool expect_1
 
 bool HTTPHeader::in(Socket *sock, bool allowpersistent)
 {
+    std::lock_guard<std::recursive_mutex> lock(header_mutex);
     if (dirty)
         reset();
     dirty = true;
