@@ -1044,6 +1044,11 @@ bool ListContainer::checkTimeAtD(int index) {
     return isNow(index);
 }
 
+// Comparator used by doSort(false): compares strings from the end.
+//
+// Important: this comparator intentionally orders in "descending" direction for this
+// custom search implementation. Even so, it MUST still obey strict-weak-ordering:
+// for equal elements, operator()(a, b) and operator()(b, a) must both be false.
 struct lessThanEWF : public std::binary_function<const size_t &, const size_t &, bool> {
     bool operator()(const size_t &aoff, const size_t &boff) {
         const char *a = data + aoff;
@@ -1052,21 +1057,27 @@ struct lessThanEWF : public std::binary_function<const size_t &, const size_t &,
         size_t blen = strlen(b);
         size_t apos = alen - 1;
         size_t bpos = blen - 1;
+
+        // Compare suffixes right-to-left (end-with-first ordering).
         for (size_t maxlen = ((alen < blen) ? alen : blen); maxlen > 0; apos--, bpos--, maxlen--) {
             if (a[apos] > b[bpos])
                 return true;
             else if (a[apos] < b[bpos])
                 return false;
         }
-        if (alen >= blen)
+
+        // Common suffix is equal; longer string wins in this ordering.
+        // On exact equality (alen == blen), return false to preserve strict ordering.
+        if (alen > blen)
             return true;
-        else //if (alen < blen)
+        else
             return false;
-        //return true;  // both equal
     };
     char *data;
 };
 
+// Comparator used by doSort(true): compares strings from the start (prefix order).
+// As above, equality must return false.
 struct lessThanSWF : public std::binary_function<const size_t &, const size_t &, bool> {
     bool operator()(const size_t &aoff, const size_t &boff) {
         const char *a = data + aoff;
@@ -1074,17 +1085,20 @@ struct lessThanSWF : public std::binary_function<const size_t &, const size_t &,
         size_t alen = strlen(a);
         size_t blen = strlen(b);
         size_t maxlen = (alen < blen) ? alen : blen;
+
         for (size_t i = 0; i < maxlen; i++) {
             if (a[i] > b[i])
                 return true;
             else if (a[i] < b[i])
                 return false;
         }
-        if (alen >= blen)
+
+        // Identical prefix; longer string wins in this ordering.
+        // On exact equality, return false.
+        if (alen > blen)
             return true;
-        else //if (alen < blen)
+        else
             return false;
-        //return true;  // both equal
     };
     char *data;
 };
