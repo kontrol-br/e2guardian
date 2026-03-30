@@ -113,6 +113,7 @@ class ipinstance : public AuthPlugin
     bool ipgroups_loaded_ = false;
     bool ipgroups_parse_error_logged_ = false;
     int ipgroups_reload_id_ = -1;
+    bool xff_no_filter_warned_ = false;
     std::mutex ipgroups_mutex_;
 
     bool ensureIPGroupsLoadedLocked();
@@ -472,6 +473,16 @@ int ipinstance::identify(Socket &peercon, Socket &proxycon, HTTPHeader &h, std::
                 }
             }
         } else {
+            if (!xff_no_filter_warned_) {
+                if (!is_daemonised)
+                    std::cerr << thread_id
+                              << "IP auth plugin: usexforwardedfor is enabled with empty xforwardedforfilterip; "
+                              << "trusting X-Forwarded-For from all peers" << std::endl;
+                syslog(LOG_WARNING,
+                       "%s",
+                       "IP auth plugin: usexforwardedfor is enabled with empty xforwardedforfilterip; trusting X-Forwarded-For from all peers");
+                xff_no_filter_warned_ = true;
+            }
             use_xforwardedfor = true;
         }
     }
@@ -697,14 +708,8 @@ int ipinstance::parseFilterGroup(const String &value, const char *filename, cons
         }
     }
 
-    bool has_digits = digits.length() > 0;
-    String numeric = has_digits ? digits : normalised;
+    String numeric = (digits.length() > 0) ? digits : normalised;
     int group = numeric.toInteger();
-    if (has_digits && group == 0) {
-        if (o.filter_groups > 0)
-            return 0;
-        group = -1;
-    }
     if ((group < 1) || (group > o.filter_groups)) {
         if (!is_daemonised)
             std::cerr << thread_id << "Filter group out of range; entry " << line << " in " << filename << std::endl;
