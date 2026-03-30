@@ -919,6 +919,11 @@ bool StoryBoard::runFunct(unsigned int fID, NaughtyFilter &cm) {
                 case SB_FUNC_SETGROUP:
                     action_return = false;
                     {
+                        // setgroup expects a group label/id coming from a matched list result.
+                        // Avoid reusing stale cm.result values when this action is attached to
+                        // non-list states (e.g. "true"), which can force unintended group stickiness.
+                        if (!(isListCheck || isHeaderCheck || isMultiListCheck) || cm.result.size() == 0)
+                            break;
                         int g = resolve_filter_group_from_label(cm.result);
                         if (g > 0 && g <= o.numfg) {
                             cm.filtergroup = g - 1;
