@@ -1,4 +1,4 @@
-This the v5.4 stable branch 
+This the v5.4.11 stable branch
 ---------------------------
 
 See notes/NEWIN_v5 for details of development progress and
@@ -6,7 +6,7 @@ target new features and improvements.
 
 See ./README.md for delails of this release.
 
-Changed and Added features in e2guardian 5.0 
+Changed and Added features in e2guardian 5.0
 --------------------------------------------
 
 Complete change to list handling and logic control.
@@ -26,10 +26,10 @@ Changed and Added features in e2guardian 4.0.0
 ----------------------------------------------
 
 Major internal rewrite to improve code quality, stability and performance
-The main advantage is the engine itself. It is more faster and powerful than before and tuning FD_SETSIZE is not needed anymore 
+The main advantage is the engine itself. It is more faster and powerful than before and tuning FD_SETSIZE is not needed anymore
 
 
-Tuning settings introduced/changed in v4.0.0:- 
+Tuning settings introduced/changed in v4.0.0:-
 --------------------------------------------
 
 e2guardian.conf

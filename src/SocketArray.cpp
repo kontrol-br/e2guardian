@@ -33,6 +33,7 @@ void SocketArray::deleteAll()
     delete[] drawer;
     drawer = NULL;
     socknum = 0;
+    lc_types.clear();
 }
 
 // close all sockets & create new ones
@@ -42,6 +43,7 @@ void SocketArray::reset(int sockcount)
 
     drawer = new Socket[sockcount];
     socknum = sockcount;
+    lc_types.clear();
 }
 
 // bind our first socket to any IP
@@ -125,25 +127,60 @@ int SocketArray::listenAll(int queue)
 // bind all sockets to given IP list
 int SocketArray::bindAll(std::deque<String> &ips, std::deque<String> &ports)
 {
-    if (ips.size() > socknum) {
+    if (ips.empty() || ports.empty()) {
         return -1;
     }
-    //for (unsigned int i = 0; i < socknum; i++) {
-    for (unsigned int i = 0; i < ips.size(); i++) {
-#ifdef E2DEBUG
-        std::cerr << thread_id << "Binding server socket[" << ports[i] << " " << ips[i] << " " << i << "])" << std::endl;
-#endif
-        if (drawer[i].bind(ips[i].toCharArray(), ports[i].toInteger())) {
-            if (!is_daemonised) {
-                std::cerr << thread_id << "Error binding server socket: ["
-                          << ports[i] << " " << ips[i] << " " << i << "] (" << strerror(errno) << ")" << std::endl;
-            }
-            syslog(LOG_ERR, "Error binding socket: [%s %s %d] (%s)", ports[i].toCharArray(), ips[i].toCharArray(), i, strerror(errno));
+
+    const unsigned int mapped_count = ips.size();
+    const unsigned int matrix_count = ips.size() * ports.size();
+
+    // mapportstoips=on -> one-to-one IP/port mapping
+    if (socknum == mapped_count) {
+        if (ports.size() != ips.size()) {
             return -1;
         }
-        lc_types.push_back(CT_PROXY);
+
+        for (unsigned int i = 0; i < ips.size(); i++) {
+#ifdef E2DEBUG
+            std::cerr << thread_id << "Binding server socket[" << ports[i] << " " << ips[i] << " " << i << "])" << std::endl;
+#endif
+            if (drawer[i].bind(ips[i].toCharArray(), ports[i].toInteger())) {
+                if (!is_daemonised) {
+                    std::cerr << thread_id << "Error binding server socket: ["
+                              << ports[i] << " " << ips[i] << " " << i << "] (" << strerror(errno) << ")" << std::endl;
+                }
+                syslog(LOG_ERR, "Error binding socket: [%s %s %d] (%s)", ports[i].toCharArray(), ips[i].toCharArray(), i, strerror(errno));
+                return -1;
+            }
+            lc_types.push_back(CT_PROXY);
+        }
+        return 0;
     }
-    return 0;
+
+    // mapportstoips=off -> bind all IP x port combinations
+    if (socknum == matrix_count) {
+        unsigned int idx = 0;
+        for (unsigned int i = 0; i < ips.size(); i++) {
+            for (unsigned int p = 0; p < ports.size(); p++) {
+#ifdef E2DEBUG
+                std::cerr << thread_id << "Binding server socket[" << ports[p] << " " << ips[i] << " " << idx << "])" << std::endl;
+#endif
+                if (drawer[idx].bind(ips[i].toCharArray(), ports[p].toInteger())) {
+                    if (!is_daemonised) {
+                        std::cerr << thread_id << "Error binding server socket: ["
+                                  << ports[p] << " " << ips[i] << " " << idx << "] (" << strerror(errno) << ")" << std::endl;
+                    }
+                    syslog(LOG_ERR, "Error binding socket: [%s %s %d] (%s)", ports[p].toCharArray(), ips[i].toCharArray(), idx, strerror(errno));
+                    return -1;
+                }
+                lc_types.push_back(CT_PROXY);
+                idx++;
+            }
+        }
+        return 0;
+    }
+
+    return -1;
 }
 
 // try connecting to all our sockets which are still open to allow tidy close
