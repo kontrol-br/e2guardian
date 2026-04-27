@@ -33,7 +33,7 @@ class SocketArray
     void deleteAll();
 
     // bind our sockets to the given IPs
-    int bindAll(std::deque<String> &ips, std::deque<String> &ports);
+    int bindAll(std::deque<String> &ips, std::deque<String> &ports, bool map_ports_to_ips);
     // bind just the one, to all available IPs
     int bindSingle(int port);
     int bindSingle(unsigned int index, int port, unsigned int CT_type);

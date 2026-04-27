@@ -125,7 +125,7 @@ int SocketArray::listenAll(int queue)
 }
 
 // bind all sockets to given IP list
-int SocketArray::bindAll(std::deque<String> &ips, std::deque<String> &ports)
+int SocketArray::bindAll(std::deque<String> &ips, std::deque<String> &ports, bool map_ports_to_ips)
 {
     if (ips.empty() || ports.empty()) {
         return -1;
@@ -135,8 +135,11 @@ int SocketArray::bindAll(std::deque<String> &ips, std::deque<String> &ports)
     const unsigned int matrix_count = ips.size() * ports.size();
 
     // mapportstoips=on -> one-to-one IP/port mapping
-    if (socknum == mapped_count) {
+    if (map_ports_to_ips) {
         if (ports.size() != ips.size()) {
+            return -1;
+        }
+        if (socknum < mapped_count) {
             return -1;
         }
 
@@ -158,7 +161,11 @@ int SocketArray::bindAll(std::deque<String> &ips, std::deque<String> &ports)
     }
 
     // mapportstoips=off -> bind all IP x port combinations
-    if (socknum == matrix_count) {
+    if (socknum < matrix_count) {
+        return -1;
+    }
+
+    if (!map_ports_to_ips) {
         unsigned int idx = 0;
         for (unsigned int i = 0; i < ips.size(); i++) {
             for (unsigned int p = 0; p < ports.size(); p++) {

@@ -1539,7 +1539,7 @@ int fc_controlit()   //
     // if we don't find one, bind to any, as per old behaviour.
     // XXX AAAARGH!
     if (o.filter_ip[0].length() > 6) {
-        if (serversockets.bindAll(o.filter_ip, o.filter_ports)) {
+        if (serversockets.bindAll(o.filter_ip, o.filter_ports, o.map_ports_to_ips)) {
             if (!is_daemonised) {
                 std::cerr << thread_id << "Error binding server socket (is something else running on the filter port and ip?"
                           << std::endl;
