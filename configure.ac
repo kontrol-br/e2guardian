@@ -97,6 +97,7 @@ AC_CHECK_FUNCS([strerror strstr strtol])
 AC_CHECK_FUNCS([setuid setgid umask seteuid setreuid setlocale])
 AC_SEARCH_LIBS([floor], [m])
 AC_SEARCH_LIBS([gethostbyname], [nsl])
+AC_SEARCH_LIBS([res_init], [resolv], [AC_DEFINE([HAVE_RES_INIT], [1], [Define to 1 if you have the res_init function.])])
 AC_SEARCH_LIBS([socket], [socket], [], [
 AC_CHECK_LIB(
 [socket], [socket], [LIBS="-lsocket -lnsl $LIBS"],
