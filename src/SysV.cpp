@@ -36,6 +36,18 @@ bool confirmname(pid_t p);
 
 // IMPLEMENTATION
 
+// wait until a process exits; returns true when it is no longer running
+bool wait_for_exit(pid_t p, int timeout_seconds)
+{
+    for (int waited = 0; waited < timeout_seconds; waited++) {
+        sleep(1);
+        if (!confirmname(p)) {
+            return true;
+        }
+    }
+    return !confirmname(p);
+}
+
 // grab the PID from the file & check it's running (returns -1 on failure)
 // (also checks process names if file method fails, but this is unimplemented)
 pid_t getpid(std::string pidfile)
@@ -120,6 +132,45 @@ int sysv_kill(std::string pidfile, bool dounlink)
     }
     std::cerr << "No e2guardian process found." << std::endl;
     return 1;
+}
+
+// kill process in the pidfile and wait for it to exit; escalate if it does not stop cleanly
+int sysv_kill_wait(std::string pidfile, int timeout_seconds, bool dounlink)
+{
+    pid_t p = getpid(pidfile);
+    if (p <= 1) {
+        return 0;
+    }
+
+    int rc = ::kill(p, SIGTERM);
+    if (rc == -1) {
+        std::cerr << "Error trying to kill pid:" << p << std::endl;
+        if (errno == EPERM) {
+            std::cerr << "Permission denied." << std::endl;
+        }
+        return 1;
+    }
+
+    if (!wait_for_exit(p, timeout_seconds)) {
+        std::cerr << "Timed out waiting for pid:" << p << "; sending SIGKILL" << std::endl;
+        rc = ::kill(p, SIGKILL);
+        if (rc == -1) {
+            std::cerr << "Error trying to force kill pid:" << p << std::endl;
+            if (errno == EPERM) {
+                std::cerr << "Permission denied." << std::endl;
+            }
+            return 1;
+        }
+        if (!wait_for_exit(p, 5)) {
+            std::cerr << "Timed out waiting for pid:" << p << " after SIGKILL" << std::endl;
+            return 1;
+        }
+    }
+
+    if (dounlink) {
+        unlink(pidfile.c_str());
+    }
+    return 0;
 }
 
 // send HUP to process

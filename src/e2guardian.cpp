@@ -108,10 +108,8 @@ int main(int argc, char *argv[])
                     return sysv_kill(o.pid_filename,true);
                 case 'Q':
                     read_config(configfile, 0);
-                    sysv_kill(o.pid_filename, false);
-                    // give the old process time to die
-                    while (sysv_amirunning(o.pid_filename))
-                        sleep(1);
+                    if (sysv_kill_wait(o.pid_filename, 30, false) != 0)
+                        return 1;
                     unlink(o.pid_filename.c_str());
                     // remember to reset config before continuing
                     needreset = true;

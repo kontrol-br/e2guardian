@@ -32,10 +32,11 @@
 #include <cstdlib>
 #include <unistd.h>
 #include <sys/time.h>
+#include <sys/stat.h>
 #include <strings.h>
+#include <mutex>
 #include <fcntl.h>
 #include <string.h>
-#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <istream>
@@ -58,6 +59,39 @@ extern OptionContainer o;
 extern bool is_daemonised;
 extern std::atomic<bool> ttg;
 extern thread_local std::string thread_id;
+
+namespace {
+#ifdef HAVE_RES_INIT
+#ifndef _PATH_RESCONF
+#define _PATH_RESCONF "/etc/resolv.conf"
+#endif
+
+void refresh_resolver_config_if_needed()
+{
+    static std::mutex resolver_mutex;
+    static time_t resolver_mtime = 0;
+    struct stat resolv_stat;
+
+    if (stat(_PATH_RESCONF, &resolv_stat) != 0) {
+        return;
+    }
+
+    if (resolv_stat.st_mtime == resolver_mtime) {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(resolver_mutex);
+    if (resolv_stat.st_mtime != resolver_mtime) {
+        res_init();
+        resolver_mtime = resolv_stat.st_mtime;
+    }
+}
+#else
+void refresh_resolver_config_if_needed()
+{
+}
+#endif
+}
 
 
 // IMPLEMENTATION
@@ -556,6 +590,7 @@ ConnectionHandler::connectUpstream(Socket &sock, NaughtyFilter &cm, int port = 0
                 hints.ai_canonname = NULL;
                 hints.ai_addr = NULL;
                 hints.ai_next = NULL;
+                refresh_resolver_config_if_needed();
                 int rc = getaddrinfo(cm.connect_site.toCharArray(), NULL, &hints, &infoptr);
                 if (rc)  // problem
                 {

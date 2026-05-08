@@ -17,6 +17,8 @@
 // Kill the process specified in the given pidfile, optionally deleting the pidfile while we're at it,
 // along with the UNIX domain sockets for the old logger & url cache
 int sysv_kill(std::string pidfile, bool dounlink = true);
+// Kill the pidfile process and wait for it to exit, escalating to SIGKILL after timeout_seconds.
+int sysv_kill_wait(std::string pidfile, int timeout_seconds = 30, bool dounlink = true);
 
 // show PID of running E2 process
 int sysv_showpid(std::string pidfile);
