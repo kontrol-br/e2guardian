@@ -30,6 +30,7 @@
 #include <cerrno>
 #include <cstring>
 #include <mutex>
+#include <cstdio>
 
 // GLOBALS
 
@@ -302,6 +303,7 @@ AuthPlugin *ipcreate(ConfigVar &definition)
 // plugin quit - clear IP, subnet & range lists
 int ipinstance::quit()
 {
+    std::lock_guard<std::mutex> guard(ipgroups_mutex_);
     iplist.clear();
     ipsubnetlist.clear();
     iprangelist.clear();
@@ -437,18 +439,27 @@ int ipinstance::init(void *args)
         return -1;
     }
 
-    ipgroups_path_ = ipgroups_path_value;
+    std::vector<ip> new_iplist;
+    std::list<ip_subnet_entry> new_ipsubnetlist;
+    std::list<ip_range_entry> new_iprangelist;
 
-    int read_result = readIPMelangeList(ipgroups_path_value.c_str());
+    int read_result = readIPMelangeList(ipgroups_path_value.c_str(), &new_iplist, &new_ipsubnetlist, &new_iprangelist);
     if (read_result < 0)
         return read_result;
 
-    ipgroups_parse_error_logged_ = false;
-    ipgroups_loaded_ = true;
-    if (auto lists = o.currentLists())
-        ipgroups_reload_id_ = lists->reload_id;
-    else
-        ipgroups_reload_id_ = -1;
+    {
+        std::lock_guard<std::mutex> guard(ipgroups_mutex_);
+        ipgroups_path_ = ipgroups_path_value;
+        ipgroups_parse_error_logged_ = false;
+        iplist.swap(new_iplist);
+        ipsubnetlist.swap(new_ipsubnetlist);
+        iprangelist.swap(new_iprangelist);
+        ipgroups_loaded_ = true;
+        if (auto lists = o.currentLists())
+            ipgroups_reload_id_ = lists->reload_id;
+        else
+            ipgroups_reload_id_ = -1;
+    }
 
     read_def_fg();
     return read_result;
@@ -541,6 +552,13 @@ bool ipinstance::ensureIPGroupsLoadedLocked()
         iprangelist.swap(new_iprangelist);
         ipgroups_reload_id_ = current_reload_id;
         ipgroups_loaded_ = true;
+        syslog(LOG_INFO,
+               "IP auth reloaded ipgroups: path=%s reload_id=%d ips=%zu subnets=%zu ranges=%zu",
+               ipgroups_path_.c_str(),
+               ipgroups_reload_id_,
+               iplist.size(),
+               ipsubnetlist.size(),
+               iprangelist.size());
     }
 
     return ipgroups_loaded_;
@@ -567,6 +585,9 @@ int ipinstance::determineGroup(std::string &user, int &rfg, StoryBoard &story, N
     SpecialIpGroup special = decode_hidden_group(fg);
     if (apply_hidden_group(special, user, cm)) {
         cm.filtergroup = rfg;
+        syslog(LOG_INFO, "IP auth decision: ip=%s source=iplist special=%s result=nogroup",
+               user.c_str(),
+               special == SpecialIpGroup::Banned ? "banned" : "exception");
         return E2AUTH_NOGROUP;
     }
     if (fg >= 0) {
@@ -581,12 +602,19 @@ int ipinstance::determineGroup(std::string &user, int &rfg, StoryBoard &story, N
 #ifdef E2DEBUG
         std::cerr << thread_id << "Matched IP " << user << " to straight IP list" << std::endl;
 #endif
+        syslog(LOG_INFO,
+               "IP auth decision: ip=%s source=iplist result=group%d reason=exact_ip_match",
+               user.c_str(),
+               rfg + 1);
         return E2AUTH_OK;
     }
     fg = inSubnet(addr);
     special = decode_hidden_group(fg);
     if (apply_hidden_group(special, user, cm)) {
         cm.filtergroup = rfg;
+        syslog(LOG_INFO, "IP auth decision: ip=%s source=subnet special=%s result=nogroup",
+               user.c_str(),
+               special == SpecialIpGroup::Banned ? "banned" : "exception");
         return E2AUTH_NOGROUP;
     }
     if (fg >= 0) {
@@ -601,12 +629,39 @@ int ipinstance::determineGroup(std::string &user, int &rfg, StoryBoard &story, N
 #ifdef E2DEBUG
         std::cerr << thread_id << "Matched IP " << user << " to subnet" << std::endl;
 #endif
+        uint32_t matched_mask = 0;
+        uint32_t matched_network = 0;
+        for (std::list<ip_subnet_entry>::const_iterator i = ipsubnetlist.begin(); i != ipsubnetlist.end(); ++i) {
+            if (i->maskedaddr == (addr & i->mask)) {
+                matched_mask = i->mask;
+                matched_network = i->maskedaddr;
+                break;
+            }
+        }
+        char netbuf[INET_ADDRSTRLEN] = {0};
+        char maskbuf[INET_ADDRSTRLEN] = {0};
+        struct in_addr net_addr;
+        struct in_addr mask_addr;
+        net_addr.s_addr = htonl(matched_network);
+        mask_addr.s_addr = htonl(matched_mask);
+        inet_ntop(AF_INET, &net_addr, netbuf, sizeof(netbuf));
+        inet_ntop(AF_INET, &mask_addr, maskbuf, sizeof(maskbuf));
+        syslog(LOG_INFO,
+               "IP auth decision: ip=%s source=subnet result=group%d reason=subnet_match network=%s mask=%s masked_ip=%s",
+               user.c_str(),
+               rfg + 1,
+               netbuf,
+               maskbuf,
+               (netbuf[0] != '\0') ? netbuf : "-");
         return E2AUTH_OK;
     }
     fg = inRange(addr);
     special = decode_hidden_group(fg);
     if (apply_hidden_group(special, user, cm)) {
         cm.filtergroup = rfg;
+        syslog(LOG_INFO, "IP auth decision: ip=%s source=range special=%s result=nogroup",
+               user.c_str(),
+               special == SpecialIpGroup::Banned ? "banned" : "exception");
         return E2AUTH_NOGROUP;
     }
     if (fg >= 0) {
@@ -621,11 +676,43 @@ int ipinstance::determineGroup(std::string &user, int &rfg, StoryBoard &story, N
 #ifdef E2DEBUG
         std::cerr << thread_id << "Matched IP " << user << " to range" << std::endl;
 #endif
+        uint32_t matched_start = 0;
+        uint32_t matched_end = 0;
+        for (std::list<ip_range_entry>::const_iterator i = iprangelist.begin(); i != iprangelist.end(); ++i) {
+            if ((addr >= i->startaddr) && (addr <= i->endaddr)) {
+                matched_start = i->startaddr;
+                matched_end = i->endaddr;
+                break;
+            }
+        }
+        char startbuf[INET_ADDRSTRLEN] = {0};
+        char endbuf[INET_ADDRSTRLEN] = {0};
+        struct in_addr start_addr;
+        struct in_addr end_addr;
+        start_addr.s_addr = htonl(matched_start);
+        end_addr.s_addr = htonl(matched_end);
+        inet_ntop(AF_INET, &start_addr, startbuf, sizeof(startbuf));
+        inet_ntop(AF_INET, &end_addr, endbuf, sizeof(endbuf));
+        syslog(LOG_INFO,
+               "IP auth decision: ip=%s source=range result=group%d reason=range_match range_start=%s range_end=%s",
+               user.c_str(),
+               rfg + 1,
+               startbuf,
+               endbuf);
         return E2AUTH_OK;
     }
 #ifdef E2DEBUG
     std::cerr << thread_id << "Matched IP " << user << " to nothing" << std::endl;
 #endif
+    syslog(LOG_INFO,
+           "IP auth decision: ip=%s source=none result=nomatch default_group=%d reload_id=%d loaded=%d ips=%zu subnets=%zu ranges=%zu reason=no_exact_no_subnet_no_range",
+           user.c_str(),
+           rfg + 1,
+           ipgroups_reload_id_,
+           ipgroups_loaded_ ? 1 : 0,
+           iplist.size(),
+           ipsubnetlist.size(),
+           iprangelist.size());
     (void)story;
     return E2AUTH_NOMATCH;
 }
@@ -773,7 +860,9 @@ int ipinstance::readIPMelangeList(const char *filename,
         if (buffer[0] == '#')
             continue;
         // ignore blank lines
-        if (strlen(buffer) < 10)
+        String raw(buffer);
+        raw.removeWhiteSpace();
+        if (raw.length() == 0)
             continue;
         line = buffer;
         // split into key & value
