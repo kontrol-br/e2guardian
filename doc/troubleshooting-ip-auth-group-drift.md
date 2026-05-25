@@ -46,3 +46,35 @@ match to the first group if not validated strictly.
 Recent code logs a warning when `usexforwardedfor=on` and
 `xforwardedforfilterip` is empty, because this trusts `X-Forwarded-For` from
 all peers and can collapse user identification unexpectedly.
+
+## 5) pfSense cron scripts can trigger service restarts (timing correlation)
+
+In `Kontrol-pkg-E2guardian54`, the cron script
+`/usr/local/www/e2guardian_logrotate.php` explicitly stops and starts
+e2guardian during log rotation (`service_control_stop/start`), and also kills
+and later restarts the watchdog process. If your incident starts right after
+that cron window, correlate timestamps first.
+
+This script rotates only `/var/log/e2guardian/access.log` and does not edit
+`/usr/local/etc/e2guardian/lists/authplugins/ipgroups` directly. So by itself
+it should not remap users to group 1, but it can be the trigger point where
+e2guardian restarts and then loads a bad/empty runtime config produced by some
+other process.
+
+The blacklist updater cron (`/usr/local/www/e2guardian.php fetch_blacklist`)
+renames/extracts content under `.../lists/blacklists*` and writes pfSense
+package config metadata. It does not touch `authplugins/ipgroups` either, but
+it can indirectly trigger broader config reload/rewrite flows in pfSense.
+
+### Correlation checklist for cron-related incidents
+
+1. Compare incident start time with cron executions of:
+   - `php -q /usr/local/www/e2guardian_logrotate.php`
+   - `php /usr/local/www/e2guardian.php fetch_blacklist`
+2. If drift starts right after logrotate, check IP auth diagnostics for:
+   - `IP auth reloaded ipgroups ... ips=0 subnets=0 ranges=0`
+   - `IP auth reloaded empty ipgroups list ... size=... inode=... mtime=...`
+3. During the same minute, verify file state atomically:
+   - `ls -li /usr/local/etc/e2guardian/lists/authplugins/ipgroups`
+   - `wc -l  /usr/local/etc/e2guardian/lists/authplugins/ipgroups`
+4. Confirm no cron/job rewrites `ipgroups` path or symlink target.

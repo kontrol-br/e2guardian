@@ -552,13 +552,6 @@ bool ipinstance::ensureIPGroupsLoadedLocked()
         iprangelist.swap(new_iprangelist);
         ipgroups_reload_id_ = current_reload_id;
         ipgroups_loaded_ = true;
-        syslog(LOG_NOTICE,
-               "IP auth reloaded ipgroups: path=%s reload_id=%d ips=%zu subnets=%zu ranges=%zu",
-               ipgroups_path_.c_str(),
-               ipgroups_reload_id_,
-               iplist.size(),
-               ipsubnetlist.size(),
-               iprangelist.size());
     }
 
     return ipgroups_loaded_;
@@ -585,9 +578,6 @@ int ipinstance::determineGroup(std::string &user, int &rfg, StoryBoard &story, N
     SpecialIpGroup special = decode_hidden_group(fg);
     if (apply_hidden_group(special, user, cm)) {
         cm.filtergroup = rfg;
-        syslog(LOG_NOTICE, "IP auth decision: ip=%s source=iplist special=%s result=nogroup",
-               user.c_str(),
-               special == SpecialIpGroup::Banned ? "banned" : "exception");
         return E2AUTH_NOGROUP;
     }
     if (fg >= 0) {
@@ -602,19 +592,12 @@ int ipinstance::determineGroup(std::string &user, int &rfg, StoryBoard &story, N
 #ifdef E2DEBUG
         std::cerr << thread_id << "Matched IP " << user << " to straight IP list" << std::endl;
 #endif
-        syslog(LOG_NOTICE,
-               "IP auth decision: ip=%s source=iplist result=group%d reason=exact_ip_match",
-               user.c_str(),
-               rfg + 1);
         return E2AUTH_OK;
     }
     fg = inSubnet(addr);
     special = decode_hidden_group(fg);
     if (apply_hidden_group(special, user, cm)) {
         cm.filtergroup = rfg;
-        syslog(LOG_NOTICE, "IP auth decision: ip=%s source=subnet special=%s result=nogroup",
-               user.c_str(),
-               special == SpecialIpGroup::Banned ? "banned" : "exception");
         return E2AUTH_NOGROUP;
     }
     if (fg >= 0) {
@@ -646,22 +629,12 @@ int ipinstance::determineGroup(std::string &user, int &rfg, StoryBoard &story, N
         mask_addr.s_addr = htonl(matched_mask);
         inet_ntop(AF_INET, &net_addr, netbuf, sizeof(netbuf));
         inet_ntop(AF_INET, &mask_addr, maskbuf, sizeof(maskbuf));
-        syslog(LOG_NOTICE,
-               "IP auth decision: ip=%s source=subnet result=group%d reason=subnet_match network=%s mask=%s masked_ip=%s",
-               user.c_str(),
-               rfg + 1,
-               netbuf,
-               maskbuf,
-               (netbuf[0] != '\0') ? netbuf : "-");
         return E2AUTH_OK;
     }
     fg = inRange(addr);
     special = decode_hidden_group(fg);
     if (apply_hidden_group(special, user, cm)) {
         cm.filtergroup = rfg;
-        syslog(LOG_NOTICE, "IP auth decision: ip=%s source=range special=%s result=nogroup",
-               user.c_str(),
-               special == SpecialIpGroup::Banned ? "banned" : "exception");
         return E2AUTH_NOGROUP;
     }
     if (fg >= 0) {
@@ -693,26 +666,11 @@ int ipinstance::determineGroup(std::string &user, int &rfg, StoryBoard &story, N
         end_addr.s_addr = htonl(matched_end);
         inet_ntop(AF_INET, &start_addr, startbuf, sizeof(startbuf));
         inet_ntop(AF_INET, &end_addr, endbuf, sizeof(endbuf));
-        syslog(LOG_NOTICE,
-               "IP auth decision: ip=%s source=range result=group%d reason=range_match range_start=%s range_end=%s",
-               user.c_str(),
-               rfg + 1,
-               startbuf,
-               endbuf);
         return E2AUTH_OK;
     }
 #ifdef E2DEBUG
     std::cerr << thread_id << "Matched IP " << user << " to nothing" << std::endl;
 #endif
-    syslog(LOG_NOTICE,
-           "IP auth decision: ip=%s source=none result=nomatch default_group=%d reload_id=%d loaded=%d ips=%zu subnets=%zu ranges=%zu reason=no_exact_no_subnet_no_range",
-           user.c_str(),
-           rfg + 1,
-           ipgroups_reload_id_,
-           ipgroups_loaded_ ? 1 : 0,
-           iplist.size(),
-           ipsubnetlist.size(),
-           iprangelist.size());
     (void)story;
     return E2AUTH_NOMATCH;
 }
