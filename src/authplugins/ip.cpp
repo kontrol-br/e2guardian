@@ -43,6 +43,26 @@ extern thread_local std::string thread_id;
 namespace
 {
 enum class SpecialIpGroup;
+
+std::string ipgroups_file_metadata(const std::string &path)
+{
+    // DEBUG INVESTIGATION (group drift): helper used only to enrich temporary
+    // diagnostics; safe to remove when extra debug logs are dropped.
+    struct stat st;
+    if (stat(path.c_str(), &st) != 0) {
+        int saved_errno = errno;
+        std::ostringstream oss;
+        oss << "path=" << path << " stat_error=" << strerror(saved_errno);
+        return oss.str();
+    }
+
+    std::ostringstream oss;
+    oss << "path=" << path
+        << " size=" << static_cast<long long>(st.st_size)
+        << " mtime=" << static_cast<long long>(st.st_mtime)
+        << " inode=" << static_cast<unsigned long long>(st.st_ino);
+    return oss.str();
+}
 }
 
 // structs linking subnets and IP ranges to filter groups
@@ -459,6 +479,15 @@ int ipinstance::init(void *args)
             ipgroups_reload_id_ = lists->reload_id;
         else
             ipgroups_reload_id_ = -1;
+    }
+
+    if (new_iplist.empty() && new_ipsubnetlist.empty() && new_iprangelist.empty()) {
+        // DEBUG INVESTIGATION (group drift): captures filesystem metadata when
+        // initial plugin load yields an unexpectedly empty ipgroups map.
+        std::string meta = ipgroups_file_metadata(ipgroups_path_value);
+        syslog(LOG_WARNING, "IP auth loaded empty ipgroups list: %s", meta.c_str());
+        if (!is_daemonised)
+            std::cerr << thread_id << "IP auth loaded empty ipgroups list: " << meta << std::endl;
     }
 
     read_def_fg();
