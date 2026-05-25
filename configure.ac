@@ -4,7 +4,7 @@
 AC_DEFINE([__SSLMITM],[""],[Define to enable SSL MITM])
 
 AC_PREREQ(2.57)
-AC_INIT(e2guardian, 5.4.17)
+AC_INIT(e2guardian, 5.4.18)
 AC_CONFIG_HEADERS([e2config.h])
 AC_CONFIG_MACRO_DIR([m4])
 AM_INIT_AUTOMAKE([subdir-objects])
