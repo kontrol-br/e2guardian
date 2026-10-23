@@ -20,6 +20,11 @@
 #include <dirent.h>
 #include <cstdlib>
 #include <unistd.h> // checkme: remove?
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <ifaddrs.h>
 
 // GLOBALS
 
@@ -56,6 +61,8 @@ void OptionContainer::reset() {
     conffile.clear();
     filter_ip.clear();
     filter_ports.clear();
+    check_ip.clear();
+    check_ports.clear();
     auth_map.clear();
 }
 
@@ -643,9 +650,32 @@ bool OptionContainer::read(std::string &filename, int type) {
             syslog(LOG_ERR, "%s", "Can not check on more than 127 IPs");
             return false;
         }
-        if (check_ip.empty()) {
-                String t = "127.0.0.1";
-                check_ip.push_back(t);
+        auto add_unique_check_ip = [this](const String &ip) {
+            if (ip.empty()) return;
+            for (const auto &existing : check_ip) {
+                if (existing == ip) return;
+            }
+            if (check_ip.size() < 127) {
+                check_ip.push_back(ip);
+            }
+        };
+        add_unique_check_ip(String("127.0.0.1"));
+        for (const auto &fip : filter_ip) {
+            add_unique_check_ip(fip);
+        }
+        struct ifaddrs *ifaddr = nullptr;
+        if (getifaddrs(&ifaddr) == 0 && ifaddr != nullptr) {
+            for (struct ifaddrs *ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
+                if (ifa->ifa_addr == nullptr) continue;
+                if (ifa->ifa_addr->sa_family == AF_INET) {
+                    char addr_buf[INET_ADDRSTRLEN] = {0};
+                    struct sockaddr_in *sin = reinterpret_cast<struct sockaddr_in *>(ifa->ifa_addr);
+                    if (inet_ntop(AF_INET, &sin->sin_addr, addr_buf, sizeof(addr_buf)) != nullptr) {
+                        add_unique_check_ip(String(addr_buf));
+                    }
+                }
+            }
+            freeifaddrs(ifaddr);
         }
 
         filter_ports = findoptionMD("filterports",":");
@@ -665,20 +695,33 @@ bool OptionContainer::read(std::string &filename, int type) {
         } // check its a reasonable value
 
         check_ports = findoptionMD("extracheckports", ":");
-        // now add filter_ports to check_ports
-        for (auto pt : filter_ports) {
+        auto add_unique_check_port = [this](const String &pt) {
+            if (pt.empty()) return;
+            for (const auto &existing : check_ports) {
+                if (existing == pt) return;
+            }
             check_ports.push_back(pt);
+        };
+        // now add filter_ports to check_ports
+        for (const auto &pt : filter_ports) {
+            add_unique_check_port(pt);
         }
 
         transparenthttps_port = findoptionI("transparenthttpsport");
         if (!realitycheck(transparenthttps_port, 0, 65535, "transparenthttpsport")) {
             return false;
         } // check its a reasonable value
+        if (transparenthttps_port > 0) {
+            add_unique_check_port(String(transparenthttps_port));
+        }
 
         icap_port = findoptionI("icapport");
         if (!realitycheck(filter_port, 0, 65535, "icapport")) {
             return false;
         } // check its a reasonable value
+        if (icap_port > 0) {
+            add_unique_check_port(String(icap_port));
+        }
 
         if (icap_port > 0) {   // add non-plugin auth for ICAP
             auth_entry sen;

@@ -48,6 +48,7 @@
 "208","O site acessado não possuo um endereço IPV4 válido"
 "209","Erro de DNS temporário - Tente novamente mais tarde"
 "210","Falha no serviço DNS - Tente novamente mais tarde"
+"212","Requisição em loop bloqueada"
 "300","Frase proibida encontrada: "
 "301","Frase proibida encontrada."
 "400","Combinação de frase proibida encontrada: "

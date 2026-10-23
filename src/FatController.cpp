@@ -552,8 +552,13 @@ void handle_connections(int tindex)
     thread_id = "hw";
     thread_id += std::to_string(tindex);
     thread_id += ": ";
-    try {
-        while (!ttg) {  // extra loop in order to delete and create ConnentionHandler on new lists or error
+    struct BusyGuard {
+        stat_rec *st;
+        explicit BusyGuard(stat_rec *s) : st(s) { ++st->busychildren; }
+        ~BusyGuard() { --st->busychildren; }
+    };
+    while (!ttg) {  // extra loop in order to delete and create ConnentionHandler on new lists or error
+        try {
             ConnectionHandler h;
             // the class that handles the connections
 	    //int rc = 0;
@@ -568,11 +573,11 @@ void handle_connections(int tindex)
                 std::cerr << thread_id << " waiting connection on http_worker_Q "  << std::endl;
 #endif
                 LQ_rec rec = o.http_worker_Q.pop();
-                Socket *peersock = rec.sock;
+                std::unique_ptr<Socket> peersock(rec.sock);
 #ifdef E2DEBUG
                 std::cerr << thread_id << " popped connection from http_worker_Q"  << std::endl;
 #endif
-                if (ttg) break;
+                if (ttg || !peersock) break;
 
                 String peersockip = peersock->getPeerIP();
                 if (peersock->getFD() < 0 || peersockip.length() < 7) {
@@ -580,7 +585,7 @@ void handle_connections(int tindex)
                     syslog(LOG_INFO, "%sError accepting. (Ignorable)", thread_id.c_str());
                     continue;
                 }
-                ++dystat->busychildren;
+                BusyGuard busy_guard(dystat);
                 ++dystat->conx;
 
 #ifdef E2DEBUG
@@ -589,14 +594,14 @@ void handle_connections(int tindex)
 #else
                 h.handlePeer(*peersock, peersockip, dystat, rec.ct_type); // deal with the connection
 #endif
-                --dystat->busychildren;
-                delete peersock;
                 break;
             };
-        };
-    } catch (...) {
-        syslog(LOG_ERR,"%sworker thread caught unexpected exception - exiting", thread_id.c_str());
-    }
+        } catch (const std::exception &e) {
+            syslog(LOG_ERR, "%sworker thread caught unexpected exception (recovering): %s", thread_id.c_str(), e.what());
+        } catch (...) {
+            syslog(LOG_ERR, "%sworker thread caught unexpected exception (recovering)", thread_id.c_str());
+        }
+    };
 }
 
 
