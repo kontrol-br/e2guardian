@@ -893,7 +893,7 @@ void log_listener(std::string log_location, bool is_RQlog, bool logsyslog, Queue
                     break;
                 case 17:
                     filtergroup = atoi(logline.c_str());
-                    if (filtergroup < 0 || filtergroup > o.numfg) filtergroup = 0;
+                    if (filtergroup < -1 || filtergroup >= o.numfg) filtergroup = 0;
                     break;
                 case 18:
                     code = atoi(logline.c_str());
@@ -1061,15 +1061,21 @@ void log_listener(std::string log_location, bool is_RQlog, bool logsyslog, Queue
 
         String groupname;
         String stringcode(code);
-        String stringgroup(filtergroup + 1);
+        String stringgroup;
 
-        if (is_RQlog) {
-            groupname = "";
+        if (filtergroup < 0) {
+            stringgroup = "0";
+            groupname = is_RQlog ? "" : "none";
         } else {
-            if (stringcode == "407") {
-                groupname = "negotiate_identification";
+            stringgroup = String(filtergroup + 1);
+            if (is_RQlog) {
+                groupname = "";
             } else {
-                groupname = ldl->fg[filtergroup]->name;
+                if (stringcode == "407") {
+                    groupname = "negotiate_identification";
+                } else {
+                    groupname = ldl->fg[filtergroup]->name;
+                }
             }
         }
 
@@ -1193,7 +1199,7 @@ void log_listener(std::string log_location, bool is_RQlog, bool logsyslog, Queue
 
 #ifdef ENABLE_EMAIL
         // do the notification work here, but fork for speed
-        if (ldl->fg[filtergroup]->use_smtp == true) {
+        if (filtergroup >= 0 && ldl->fg[filtergroup]->use_smtp == true) {
 
             // run through the gambit to find out of we're sending notification
             // because if we're not.. then fork()ing is a waste of time.

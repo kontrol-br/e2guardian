@@ -789,6 +789,12 @@ bool StoryBoard::runFunct(unsigned int fID, NaughtyFilter &cm) {
                     else
                         cm.whatIsNaughtyLog = o.language_list.getTranslation(cm.log_message_no) + cm.lastmatch;
                     cm.exceptioncat = cm.lastcategory;
+                    if (cm.message_no == 600 || cm.message_no == 631 || cm.log_message_no == 600 || cm.log_message_no == 631) {
+                        cm.special_exception_ip = true;
+                        cm.filtergroup = -1;
+                        cm.nomitm = true;
+                        cm.automitm = false;
+                    }
                     break;
                 case SB_FUNC_SETGREY:
                     cm.isGrey = true;
@@ -811,6 +817,10 @@ bool StoryBoard::runFunct(unsigned int fID, NaughtyFilter &cm) {
                     else
                         cm.whatIsNaughtyLog = o.language_list.getTranslation(cm.log_message_no) + cm.get_lastmatch();
                     cm.whatIsNaughtyCategories = cm.lastcategory;
+                    if (cm.message_no == 100 || cm.log_message_no == 103 || cm.log_message_no == 104) {
+                        cm.special_banned_ip = true;
+                        cm.filtergroup = -1;
+                    }
                     break;
                 case SB_FUNC_SETMODURL:
                     cm.urlmodified = true;

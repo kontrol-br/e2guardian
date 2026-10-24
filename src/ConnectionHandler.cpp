@@ -1082,7 +1082,19 @@ int ConnectionHandler::handleConnection(Socket &peerconn, String &ip, bool ismit
             //
             // don't have credentials for this connection yet? get some!
             overide_persist = false;
-            if (!persistent_authed) {
+            if (checkme.special_exception_ip || (checkme.isexception && (checkme.message_no == 600 || checkme.message_no == 631))) {
+                checkme.special_exception_ip = true;
+                filtergroup = -1;
+                checkme.filtergroup = -1;
+                checkme.nomitm = true;
+                checkme.automitm = false;
+                authed = true;
+            } else if (checkme.special_banned_ip || (checkme.isBlocked && (checkme.message_no == 100 || checkme.log_message_no == 103 || checkme.log_message_no == 104))) {
+                checkme.special_banned_ip = true;
+                filtergroup = -1;
+                checkme.filtergroup = -1;
+                authed = true;
+            } else if (!persistent_authed) {
                 bool only_ip_auth;
                 if (header.isProxyRequest) {
                     filtergroup = o.default_fg;
@@ -1156,9 +1168,9 @@ int ConnectionHandler::handleConnection(Socket &peerconn, String &ip, bool ismit
 #ifdef __SSLMITM
             //			Set if candidate for MITM
             //			(Exceptions will not go MITM)
-            checkme.ismitmcandidate = checkme.isconnect && (!checkme.nomitm) && ldl->fg[filtergroup]->ssl_mitm && (header.port == 443);
+            checkme.ismitmcandidate = checkme.isconnect && (!checkme.nomitm) && (filtergroup >= 0 && ldl->fg[filtergroup]->ssl_mitm) && (header.port == 443);
             if (checkme.ismitmcandidate ) {
-                if(!ldl->fg[filtergroup]->automitm) checkme.automitm = false;
+                if(filtergroup >= 0 && !ldl->fg[filtergroup]->automitm) checkme.automitm = false;
             } else {
                 checkme.nomitm = true;
                 checkme.automitm = false;
@@ -1175,7 +1187,7 @@ int ConnectionHandler::handleConnection(Socket &peerconn, String &ip, bool ismit
                 temp += ip;
                 temp += "<br>";
                 temp += "Filtergroup: ";
-                temp += ldl->fg[filtergroup]->name;
+                temp += (filtergroup >= 0) ? ldl->fg[filtergroup]->name : "none";
                 temp += "<br>";
                 temp += "Flags: ";
                 temp += checkme.getFlags();
@@ -1206,7 +1218,8 @@ int ConnectionHandler::handleConnection(Socket &peerconn, String &ip, bool ismit
 
             // virus checking candidate?
             // checkme.noviruscheck defaults to true
-            if (!(checkme.isdone || checkme.isconnect || checkme.ishead)    //  can't scan connect or head or not yet authed
+            if (filtergroup >= 0
+                && !(checkme.isdone || checkme.isconnect || checkme.ishead)    //  can't scan connect or head or not yet authed
                 && !(checkme.isBlocked)  // or already blocked
                 && authed   // and is authed
                 && (o.csplugins.size() > 0)            //  and we have scan plugins
@@ -1220,7 +1233,7 @@ int ConnectionHandler::handleConnection(Socket &peerconn, String &ip, bool ismit
             // Start of Storyboard checking
             //
 //            if (!(checkme.isBlocked || checkme.isbypass))
-            if (!(checkme.isBlocked || checkme.isdone || checkme.special_exception_ip) && authed) {
+            if (filtergroup >= 0 && !(checkme.isBlocked || checkme.isdone || checkme.special_exception_ip) && authed) {
 // Main checking is now done in Storyboard function(s)
                 //   String funct = "checkrequest";
                 //   ldl->fg[filtergroup]->StoryB.runFunct(funct, checkme);
@@ -1444,7 +1457,7 @@ int ConnectionHandler::handleConnection(Socket &peerconn, String &ip, bool ismit
                     persistPeer = false;
                     persistProxy = false;
                 } else {
-                    if (!checkme.noviruscheck && !ldl->fg[filtergroup]->content_scan_exceptions)
+                    if (!checkme.noviruscheck && (filtergroup < 0 || !ldl->fg[filtergroup]->content_scan_exceptions))
                         checkme.noviruscheck = true;
                     if (checkme.noviruscheck) {
                         checkme.tunnel_2way = false;
@@ -1461,7 +1474,7 @@ int ConnectionHandler::handleConnection(Socket &peerconn, String &ip, bool ismit
 #ifdef E2DEBUG
                 std::cerr << "Going MITM ...." << std::endl;
 #endif
-                if(!ldl->fg[filtergroup]->mitm_check_cert)
+                if(filtergroup >= 0 && !ldl->fg[filtergroup]->mitm_check_cert)
                     checkme.nocheckcert = true;
                 goMITM(checkme, proxysock, peerconn, persistProxy, authed, persistent_authed, ip, dystat, clientip,checkme.isdirect);
                 persistPeer = false;
@@ -1472,7 +1485,7 @@ int ConnectionHandler::handleConnection(Socket &peerconn, String &ip, bool ismit
 #endif
 
             //CALL SB checkresponse
-            if ((!checkme.isItNaughty) && (!checkme.upfailure) && (!checkme.isconnect) && (!checkme.logcategory) && !checkme.tunnel_rest) {
+            if (filtergroup >= 0 && (!checkme.isItNaughty) && (!checkme.upfailure) && (!checkme.isconnect) && (!checkme.logcategory) && !checkme.tunnel_rest) {
                 ldl->fg[filtergroup]->StoryB.runFunctEntry(ENT_STORYB_PROXY_RESPONSE, checkme);
 #ifdef E2DEBUG
                 std::cerr << thread_id << "After StoryB checkresponse " << checkme.isexception << " mess_no "
@@ -1489,7 +1502,7 @@ int ConnectionHandler::handleConnection(Socket &peerconn, String &ip, bool ismit
                 if (checkme.ishead || (docheader.contentLength() == 0 && !docheader.chunked))
                     checkme.tunnel_rest = true;
 
-                if (checkme.isexception && !ldl->fg[filtergroup]->content_scan_exceptions) {
+                if (checkme.isexception && (filtergroup < 0 || !ldl->fg[filtergroup]->content_scan_exceptions)) {
                     checkme.tunnel_rest = true;
                     checkme.noviruscheck = true;
                 }
@@ -1628,7 +1641,7 @@ void ConnectionHandler::doLog(std::string &who, std::string &from, NaughtyFilter
     unsigned int port = cm.request_header->port;
     std::string what;
 
-    if (!(cm.special_exception_ip || cm.special_banned_ip))
+    if (!(cm.special_exception_ip || cm.special_banned_ip || cm.filtergroup < 0 || filtergroup < 0))
         ldl->fg[filtergroup]->StoryB.runFunctEntry(ENT_STORYB_LOG_CHECK, cm);
     if(cm.nolog) return;
 
@@ -1653,7 +1666,7 @@ void ConnectionHandler::doLog(std::string &who, std::string &from, NaughtyFilter
     bool wasscanned = cm.wasscanned;
     int naughtiness = cm.naughtiness;
     int filtergroup = cm.filtergroup;
-    int logged_filtergroup = (cm.special_exception_ip || cm.special_banned_ip) ? -1 : filtergroup;
+    int logged_filtergroup = (cm.special_exception_ip || cm.special_banned_ip || cm.filtergroup < 0 || filtergroup < 0) ? -1 : filtergroup;
     HTTPHeader *reqheader = cm.request_header;
     int message_no = cm.message_no;
     bool contentmodified = cm.contentmodified;
@@ -1825,7 +1838,7 @@ void ConnectionHandler::doRQLog(std::string &who, std::string &from, NaughtyFilt
     bool wasscanned = false;  //cm.wasscanned;
     int naughtiness = 0;  //cm.naughtiness;
     int filtergroup = cm.filtergroup;
-    int logged_filtergroup = (cm.special_exception_ip || cm.special_banned_ip) ? -1 : filtergroup;
+    int logged_filtergroup = (cm.special_exception_ip || cm.special_banned_ip || cm.filtergroup < 0 || filtergroup < 0) ? -1 : filtergroup;
     HTTPHeader *reqheader = cm.request_header;
     int message_no = cm.message_no;
     bool contentmodified = false; //cm.contentmodified;
@@ -1970,6 +1983,7 @@ bool ConnectionHandler::genDenyAccess(Socket &peerconn, String &eheader, String 
                                       std::string *clientip, int filtergroup,
                                       bool ispostblock, int headersent, bool wasinfected, bool scanerror,
                                       bool forceshow) {
+    if (filtergroup < 0 || filtergroup >= o.numfg) filtergroup = 0;
     int reporting_level = ldl->fg[filtergroup]->reporting_level;
 #ifdef E2DEBUG
 
@@ -3565,28 +3579,37 @@ std::cerr << thread_id << " -got peer connection - clientip is " << clientip << 
             checkme.isItNaughty = checkme.isBlocked;
             bool isbannedip = checkme.isBlocked;
 
-            //
-            //
-            // Start of Authentication Checks
-            //
-            //
-            // don't have credentials for this connection yet? get some!
-            overide_persist = false;
-            if(!(checkme.isItNaughty || checkme.isexception)) {
-                if (!doAuth(checkme.auth_result, authed, filtergroup, auth_plugin,  peerconn, proxysock,  header, checkme, true, true))
-                {
-
-                    if((checkme.auth_result == E2AUTH_REDIRECT) && ldl->fg[filtergroup]->ssl_mitm)
+            if (checkme.special_exception_ip || (checkme.isexception && (checkme.message_no == 600 || checkme.message_no == 631))) {
+                checkme.special_exception_ip = true;
+                filtergroup = -1;
+                checkme.filtergroup = -1;
+                checkme.nomitm = true;
+                checkme.automitm = false;
+                authed = true;
+            } else if (checkme.special_banned_ip || (checkme.isBlocked && (checkme.message_no == 100 || checkme.log_message_no == 103 || checkme.log_message_no == 104))) {
+                checkme.special_banned_ip = true;
+                filtergroup = -1;
+                checkme.filtergroup = -1;
+                authed = true;
+            } else {
+                // Start of Authentication Checks
+                overide_persist = false;
+                if(!(checkme.isItNaughty || checkme.isexception)) {
+                    if (!doAuth(checkme.auth_result, authed, filtergroup, auth_plugin,  peerconn, proxysock,  header, checkme, true, true))
                     {
-                       if(!checkme.nomitm)checkme.gomitm = true;
-                       checkme.isdone = true;
-                    } else {
-                       break;
-                    }
-                 }
+
+                        if((checkme.auth_result == E2AUTH_REDIRECT) && ldl->fg[filtergroup]->ssl_mitm)
+                        {
+                           if(!checkme.nomitm)checkme.gomitm = true;
+                           checkme.isdone = true;
+                        } else {
+                           break;
+                        }
+                     }
+                }
+                checkme.filtergroup = filtergroup;
+                if(!checkme.nomitm) checkme.nomitm = !ldl->fg[filtergroup]->ssl_mitm;
             }
-            checkme.filtergroup = filtergroup;
-            if(!checkme.nomitm) checkme.nomitm = !ldl->fg[filtergroup]->ssl_mitm;
 
 #ifdef E2DEBUG
             std::cerr << thread_id << " -username: " << clientuser << " -filtergroup: " << filtergroup << std::endl;
@@ -3608,8 +3631,8 @@ std::cerr << thread_id << " -got peer connection - clientip is " << clientip << 
             checkme.clientip = clientip;
 
 
-            if(checkme.hasSNI & !checkme.nomitm ) checkme.ismitmcandidate = ldl->fg[filtergroup]->ssl_mitm;
-            if(checkme.ismitmcandidate) {
+            if(filtergroup >= 0 && checkme.hasSNI && !checkme.nomitm ) checkme.ismitmcandidate = ldl->fg[filtergroup]->ssl_mitm;
+            if(filtergroup >= 0 && checkme.ismitmcandidate) {
                 checkme.automitm = ldl->fg[filtergroup]->automitm;
             }
 
@@ -3642,7 +3665,7 @@ std::cerr << thread_id << " -got peer connection - clientip is " << clientip << 
             //
             // being a banned user/IP overrides the fact that a site may be in the exception lists
             // needn't check these lists in bypass modes
-            if (!(checkme.isdone || isbanneduser || isbannedip || checkme.isexception)) {
+            if (filtergroup >= 0 && !(checkme.isdone || isbanneduser || isbannedip || checkme.isexception)) {
                     ldl->fg[filtergroup]->StoryB.runFunctEntry(ENT_STORYB_THTTPS_REQUEST,checkme);
 #ifdef E2DEBUG
                     std::cerr << thread_id << "After StoryB thttps-checkrequest " << checkme.isexception << " mess_no "
