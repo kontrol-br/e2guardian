@@ -36,6 +36,14 @@ class Socket : public BaseSocket
 
     // connect to given IP & port (following default constructor)
     int connect(const std::string &ip, int port);
+    // connect to given IP & port binding to a specific local IP and/or setting IP_TOS
+    int connect(const std::string &ip, int port, const std::string &local_ip, int tos = -1);
+
+    // get/set outbound gateway metadata for connection reuse tracking
+    std::string getBoundLocalIP() const { return bound_local_ip; }
+    int getBoundTos() const { return bound_tos; }
+    std::string getConnectedGateway() const { return connected_gateway; }
+    void setConnectedGateway(const std::string &gw) { connected_gateway = gw; }
 
     // bind to given port
     int bind(int port);
@@ -146,6 +154,9 @@ class Socket : public BaseSocket
     struct sockaddr_in peer_adr;
     int my_port;
     bool ieof = false;
+    std::string bound_local_ip;
+    int bound_tos = -1;
+    std::string connected_gateway;
 };
 
 #endif

@@ -186,6 +186,8 @@ void NaughtyFilter::reset()
     orig_ip = "";
     orig_port = 0;
     got_orig_ip = false;
+    gateway_name = "";
+    gateway_ip = "";
 
 }
 
@@ -1100,6 +1102,10 @@ String NaughtyFilter::getFlags() {
         flags += authrec->user_source;
         flags += ":";
         flags += authrec->group_source;
+        if (!gateway_name.empty()) {
+            flags += ":";
+            flags += gateway_name;
+        }
     }
     return flags;
 }

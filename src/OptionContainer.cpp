@@ -948,6 +948,12 @@ bool OptionContainer::read(std::string &filename, int type) {
 
         }
 
+        gateway_rules_location = findoptionS("gatewayrules");
+        if (gateway_rules_location.empty()) {
+            gateway_rules_location = __CONFDIR;
+            gateway_rules_location += "/lists/gatewayrules";
+        }
+
         per_room_directory_location = findoptionS("perroomdirectory");
 
         if (!realitycheck(filter_groups, 1, 0, "filtergroups")) {

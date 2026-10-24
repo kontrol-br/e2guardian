@@ -22,6 +22,9 @@
 #include "Queue.hpp"
 
 #include <deque>
+#include <vector>
+#include <map>
+#include <atomic>
 
 #ifdef __SSLMITM
 #include "CertificateAuthority.hpp"
@@ -29,6 +32,37 @@
 
 
 // DECLARATIONS
+struct GatewayEndpoint {
+    std::string name;
+    std::string if_name;
+    std::string local_ip;
+    std::string gw_ip;
+    int tos = -1;
+    int tier = 1;
+    int weight = 1;
+    bool up = true;
+};
+
+struct GatewayRule {
+    enum SrcType { SRC_ANY = 0, SRC_IP, SRC_USER } src_type = SRC_ANY;
+    enum DstType { DST_ANY = 0, DST_DOMAIN, DST_URL, DST_IP } dst_type = DST_ANY;
+
+    std::vector<uint32_t> src_ips;
+    std::vector<ipl_rangestruct> src_ranges;
+    std::vector<ipl_subnetstruct> src_subnets;
+    std::vector<std::string> src_users;
+
+    std::vector<std::string> dst_domains_exact;
+    std::vector<std::string> dst_domains_wild;
+    std::vector<std::string> dst_urls;
+    std::vector<uint32_t> dst_ips;
+    std::vector<ipl_rangestruct> dst_ranges;
+    std::vector<ipl_subnetstruct> dst_subnets;
+
+    std::string gateway;
+    std::string name;
+};
+
 struct room_item {
     std::string name;
     IPList *iplist;
@@ -94,8 +128,18 @@ class LOptionContainer
         return start_time;
     }
 
+    bool hasGatewayRules() const { return !gateway_rules.empty(); }
+    void loadGatewayRules(const std::string &filename);
+    std::string matchGatewayRule(const std::string &client_ip, const std::string &client_user,
+                                 const String &domain, const String &url, const std::string &dest_ip) const;
+    std::vector<GatewayEndpoint> getGatewayEndpoints(const std::string &gw_name) const;
+
 
     private:
+    std::vector<GatewayRule> gateway_rules;
+    std::map<std::string, GatewayEndpoint> gateways_map;
+    std::map<std::string, std::vector<GatewayEndpoint>> gateway_groups_map;
+    mutable std::atomic<uint32_t> gw_rr_counter{0};
     std::string per_room_directory_location;
     std::deque<std::string> conffile;
     std::string conffilename;

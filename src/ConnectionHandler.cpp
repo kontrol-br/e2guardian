@@ -537,6 +537,42 @@ ConnectionHandler::connectUpstream(Socket &sock, NaughtyFilter &cm, int port = 0
 
     sock.setTimeout(o.connect_timeout);
 
+    auto connect_to_ip = [&](const std::string &target_ip, int target_port) -> int {
+        std::string gw_name;
+        if (ldl && ldl->hasGatewayRules()) {
+            gw_name = ldl->matchGatewayRule(cm.clientip, clientuser, cm.urldomain, cm.baseurl, target_ip);
+        }
+        cm.gateway_name = gw_name;
+        if (!gw_name.empty()) {
+            std::string gw_tag = " [GW:" + gw_name + "]";
+            if (cm.whatIsNaughtyLog.find(gw_tag) == std::string::npos) {
+                cm.whatIsNaughtyLog += gw_tag;
+            }
+        }
+        std::vector<GatewayEndpoint> eps;
+        if (!gw_name.empty() && ldl) {
+            eps = ldl->getGatewayEndpoints(gw_name);
+        }
+        if (!eps.empty()) {
+            int r = -1;
+            for (const auto &ep : eps) {
+                r = sock.connect(target_ip, target_port, ep.local_ip, ep.tos);
+                if (r == 0) {
+                    sock.setConnectedGateway(gw_name);
+                    cm.gateway_ip = ep.gw_ip;
+                    return 0;
+                }
+            }
+            return r;
+        }
+        int r = sock.connect(target_ip, target_port);
+        if (r == 0) {
+            sock.setConnectedGateway(gw_name);
+            cm.gateway_ip = "";
+        }
+        return r;
+    };
+
 
     while (++retry < o.connect_retries) {
         lerr_mess = 0;
@@ -573,7 +609,7 @@ ConnectionHandler::connectUpstream(Socket &sock, NaughtyFilter &cm, int port = 0
 #ifdef E2DEBUG
                 std::cerr << thread_id << "Connecting to IP " << des_ip << " port " << port << std::endl;
 #endif
-                int rc = sock.connect(des_ip, port);
+                int rc = connect_to_ip(des_ip.toCharArray(), port);
                 if (rc < 0) {
                     lerr_mess = 203;
                     continue;
@@ -644,7 +680,7 @@ ConnectionHandler::connectUpstream(Socket &sock, NaughtyFilter &cm, int port = 0
                     std::cerr << thread_id << "Connecting to IP " << t << " port " <<
                     port << " after dns lookup" << std::endl;
 #endif
-                    int rc = sock.connect(t, port);
+                    int rc = connect_to_ip(t, port);
                     if (rc == 0) {
                         freeaddrinfo(infoptr);
 #ifdef E2DEBUG
@@ -677,6 +713,9 @@ ConnectionHandler::connectUpstream(Socket &sock, NaughtyFilter &cm, int port = 0
     cm.message_no = lerr_mess;
     cm.whatIsNaughty = o.language_list.getTranslation(lerr_mess);
     cm.whatIsNaughtyLog = cm.whatIsNaughty;
+    if (!cm.gateway_name.empty()) {
+        cm.whatIsNaughtyLog += " [GW:" + cm.gateway_name + "]";
+    }
     cm.whatIsNaughtyCategories = "";
     cm.whatIsNaughtyDisplayCategories = "";
     cm.isItNaughty = true;
@@ -1199,6 +1238,9 @@ int ConnectionHandler::handleConnection(Socket &peerconn, String &ip, bool ismit
 		}
             }
 
+            if (!checkme.isdirect && ldl && ldl->hasGatewayRules()) {
+                checkme.isdirect = true;
+            }
             if (checkme.isdirect) {
                 header.setDirect();
                 last_isdirect = true;
@@ -1275,6 +1317,25 @@ int ConnectionHandler::handleConnection(Socket &peerconn, String &ip, bool ismit
                     checkme.gomitm = false;   // if not automitm
                 }
             } else {
+                if (persistProxy && checkme.isdirect && ldl && ldl->hasGatewayRules()) {
+                    std::string peer_ip = proxysock.getPeerIP();
+                    std::string expected_gw = ldl->matchGatewayRule(checkme.clientip, clientuser, checkme.urldomain, checkme.baseurl, peer_ip);
+                    if (expected_gw != proxysock.getConnectedGateway()) {
+                        if (ismitm) {
+                            proxysock.stopSsl();
+                        }
+                        proxysock.close();
+                        persistProxy = false;
+                    } else {
+                        checkme.gateway_name = expected_gw;
+                        if (!expected_gw.empty()) {
+                            std::string gw_tag = " [GW:" + expected_gw + "]";
+                            if (checkme.whatIsNaughtyLog.find(gw_tag) == std::string::npos) {
+                                checkme.whatIsNaughtyLog += gw_tag;
+                            }
+                        }
+                    }
+                }
                 if (!persistProxy) // open upstream connection
                 {
                     int out_port = header.port;
@@ -1290,6 +1351,14 @@ int ConnectionHandler::handleConnection(Socket &peerconn, String &ip, bool ismit
                         // timeout -etc
                         } else {
                        //     checkme.gomitm = false;   // if not automitm
+                        }
+                    } else if (ismitm && !checkme.upfailure) {
+                        std::string certpath = std::string(o.ssl_certificate_path);
+                        if (proxysock.startSslClient(certpath, checkme.urldomain) != 0) {
+                            checkme.upfailure = true;
+                        } else if (!checkme.nocheckcert) {
+                            checkCertificate(checkme.urldomain, &proxysock, &checkme);
+                            checkme.badcert = checkme.isItNaughty;
                         }
                     }
                 }
@@ -3379,26 +3448,30 @@ std::cerr << thread_id << " -got peer connection - clientip is " << clientip << 
         bool persistProxy = false;
         //bool direct = false;
 
-        char buff[2048];
-        rc = peerconn.readFromSocket(buff, 5, (MSG_PEEK ), 20000, true);
+        char hdr[5];
+        rc = peerconn.readFromSocket(hdr, 5, (MSG_PEEK ), 20000, true);
 #ifdef E2DEBUG
-            std::cerr << thread_id << "bytes peeked " << rc << std::endl;
+        std::cerr << thread_id << "bytes peeked " << rc << std::endl;
 #endif
-        unsigned short toread = 0;
+        unsigned int toread = 0;
         if (rc == 5) {
-        if (buff[0] == 22 && buff[1] == 3 && buff[2] > 0 && buff[2] < 4 )   // has TLS hello signiture
-            checkme.isTLS = true;
-
-        toread = ( buff[3] << (8*1) | buff[4]);
-        if (toread > 2048) toread = 2048;
+            if ((unsigned char)hdr[0] == 22 && (unsigned char)hdr[1] == 3 &&
+                (unsigned char)hdr[2] > 0 && (unsigned char)hdr[2] < 4) {
+                checkme.isTLS = true;
+            }
+            unsigned int rec_len = ((unsigned char)hdr[3] << 8) | (unsigned char)hdr[4];
+            toread = 5 + rec_len;
+            if (toread > 16384) toread = 16384;
+            if (toread < 5) toread = 5;
         }
 
 #ifdef E2DEBUG
-        std::cerr << thread_id << "hello length is " << toread << " magic is " << buff[0]  << buff[1] << buff[2] << " isTLS is " << checkme.isTLS << std::endl;
+        std::cerr << thread_id << "hello length is " << toread << " magic is " << (int)(unsigned char)hdr[0] << " " << (int)(unsigned char)hdr[1] << " " << (int)(unsigned char)hdr[2] << " isTLS is " << checkme.isTLS << std::endl;
 #endif
 
-       if(checkme.isTLS) {
-            rc = peerconn.readFromSocket(buff, toread, (MSG_PEEK ), 10000, false);
+        if (checkme.isTLS) {
+            std::vector<char> peek_buf(toread);
+            rc = peerconn.readFromSocket(peek_buf.data(), toread, (MSG_PEEK ), 10000, false);
             if (rc < 1 ) {     // get header from client, allowing persistency
                 if (o.logconerror) {
                     if (peerconn.getFD() > -1) {
@@ -3421,20 +3494,20 @@ std::cerr << thread_id << " -got peer connection - clientip is " << clientip << 
                                 thread_id.c_str() );
                     }
                 }
-            firsttime = false;
-            //persistPeer = false;
-        } else {
+                firsttime = false;
+                //persistPeer = false;
+            } else {
 #ifdef E2DEBUG
-            std::cerr << thread_id << "bytes peeked " << rc << std::endl;
+                std::cerr << thread_id << "bytes peeked " << rc << std::endl;
 #endif
-             char *ret = get_TLS_SNI(buff, &rc);
-             if (ret != NULL) {
-             checkme.url = ret;
-             checkme.hasSNI = true;
-             }
+                std::string tls_sni;
+                if (get_TLS_SNI(peek_buf.data(), rc, tls_sni)) {
+                    checkme.url = tls_sni;
+                    checkme.hasSNI = true;
+                }
 
-            ++dystat->reqs;
-        }
+                ++dystat->reqs;
+            }
         }
 
         get_original_ip_port(peerconn,checkme);
@@ -3585,6 +3658,9 @@ std::cerr << thread_id << " -got peer connection - clientip is " << clientip << 
             }
 
             //now send upstream and get response
+            if (!checkme.isdirect && ldl && ldl->hasGatewayRules()) {
+                checkme.isdirect = true;
+            }
             if (!checkme.isItNaughty && !persistProxy) {
                 int out_port;
                 if(checkme.got_orig_ip && o.use_original_ip_port)
@@ -3674,49 +3750,82 @@ std::cerr << thread_id << " -got peer connection - clientip is " << clientip << 
 }
 
 
-char *get_TLS_SNI(char *inbytes, int* len)
+bool get_TLS_SNI(const char *inbytes, int len, std::string &sni)
 {
-    unsigned char *bytes = reinterpret_cast<unsigned char*>(inbytes);
-    unsigned char *curr;
-    unsigned char *ebytes;
-     ebytes = bytes + *len;
-    if (*len < 44) return NULL;
+    sni.clear();
+    if (inbytes == NULL || len < 44)
+        return false;
+
+    const unsigned char *bytes = reinterpret_cast<const unsigned char*>(inbytes);
+    const unsigned char *ebytes = bytes + len;
+
+    // Byte 43 is Session ID length
     unsigned char sidlen = bytes[43];
-    curr = bytes + 1 + 43 + sidlen;
-    if (curr > ebytes) return NULL;
-    unsigned short cslen = ntohs(*(unsigned short*)curr);
+    const unsigned char *curr = bytes + 44 + sidlen;
+
+    // Need at least 2 bytes for Cipher Suites length
+    if (curr + 2 > ebytes)
+        return false;
+    unsigned short cslen = ((unsigned short)curr[0] << 8) | curr[1];
     curr += 2 + cslen;
-    if (curr > ebytes) return NULL;
+
+    // Need at least 1 byte for Compression Methods length
+    if (curr + 1 > ebytes)
+        return false;
     unsigned char cmplen = *curr;
     curr += 1 + cmplen;
-    if (curr > ebytes) return NULL;
-    unsigned char *maxchar = curr + 2 + ntohs(*(unsigned short*)curr);
+
+    // Need at least 2 bytes for Extensions total length
+    if (curr + 2 > ebytes)
+        return false;
+    unsigned short ext_total_len = ((unsigned short)curr[0] << 8) | curr[1];
     curr += 2;
-    unsigned short ext_type = 1;
-    unsigned short ext_len;
-    while(curr < maxchar && ext_type != 0)
+
+    const unsigned char *maxchar = curr + ext_total_len;
+    if (maxchar > ebytes)
+        maxchar = ebytes; // Never parse beyond actually received buffer
+
+    while (curr + 4 <= maxchar)
     {
-        if (curr > ebytes) return NULL;
-        ext_type = ntohs(*(unsigned short*)curr);
-        curr += 2;
-        if (curr > ebytes) return NULL;
-        ext_len = ntohs(*(unsigned short*)curr);
-        curr += 2;
-        if(ext_type == 0)
+        unsigned short ext_type = ((unsigned short)curr[0] << 8) | curr[1];
+        unsigned short ext_len = ((unsigned short)curr[2] << 8) | curr[3];
+        curr += 4;
+
+        if (curr + ext_len > maxchar)
+            break; // Truncated extension
+
+        if (ext_type == 0) // Server Name Indication (SNI)
         {
-            curr += 3;
-            if (curr > ebytes) return NULL;
-            unsigned short namelen = ntohs(*(unsigned short*)curr);
-            curr += 2;
-            if ((curr + namelen) > ebytes) return NULL;
-            //*len = namelen;
-            *(curr +namelen) = (char)0;
-            return (char*)curr;
+            // RFC 6066: ServerNameList (2 bytes len) + ServerNameType (1 byte) + HostName (2 bytes len + data)
+            if (ext_len >= 5)
+            {
+                unsigned char name_type = curr[2];
+                if (name_type == 0) // host_name
+                {
+                    unsigned short namelen = ((unsigned short)curr[3] << 8) | curr[4];
+                    if (5 + namelen <= ext_len && namelen > 0 && namelen < 1024)
+                    {
+                        sni.assign(reinterpret_cast<const char*>(curr + 5), namelen);
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
-        else curr += ext_len;
+
+        curr += ext_len;
     }
-    //if (curr != maxchar) throw std::exception("incomplete SSL Client Hello");
-    return NULL; //SNI was not present
+
+    return false;
+}
+
+char *get_TLS_SNI(char *inbytes, int* len)
+{
+    static thread_local std::string tls_sni_storage;
+    if (len == NULL || !get_TLS_SNI(inbytes, *len, tls_sni_storage))
+        return NULL;
+    *len = static_cast<int>(tls_sni_storage.length());
+    return const_cast<char*>(tls_sni_storage.c_str());
 }
 
 #endif

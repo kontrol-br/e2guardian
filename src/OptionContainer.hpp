@@ -197,6 +197,7 @@ class OptionContainer
 #endif
 
     std::string storyboard_location;
+    std::string gateway_rules_location;
 
     std::deque<String> iplist_dq;
     std::deque<String> sitelist_dq;

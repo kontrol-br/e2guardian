@@ -21,6 +21,12 @@
 #include <cstdlib>
 #include <map>
 #include <utility>
+#include <algorithm>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <ifaddrs.h>
 #include <unistd.h> // checkme: remove?
 
 // GLOBALS
@@ -148,8 +154,10 @@ LOptionContainer::LOptionContainer(int load_id)
         else
             syslog(LOG_INFO, "Error in reading filter group files");
     }
-    if (loaded_ok)
+    if (loaded_ok) {
         normaliseAuthMapGroups();
+        loadGatewayRules(o.gateway_rules_location);
+    }
     reload_id = load_id;
     ++o.LC_cnt;
     if (load_id == 0)    o.numfg = numfg;   // do this on first load only
@@ -391,6 +399,9 @@ void LOptionContainer::reset()
 {
     deleteFilterGroups();
     deleteRooms();
+    gateway_rules.clear();
+    gateways_map.clear();
+    gateway_groups_map.clear();
     conffile.clear();
     --o.LC_cnt;
 }
@@ -870,3 +881,505 @@ bool LOptionContainer::readAnotherFilterGroupConf(const char *filename, const ch
     }
     return true;
 }
+
+static std::string trim_str(const std::string &s)
+{
+    size_t start = s.find_first_not_of(" \t\r\n");
+    if (start == std::string::npos)
+        return "";
+    size_t end = s.find_last_not_of(" \t\r\n");
+    return s.substr(start, end - start + 1);
+}
+
+static std::string to_lower_str(std::string s)
+{
+    for (size_t i = 0; i < s.size(); ++i) {
+        if (s[i] >= 'A' && s[i] <= 'Z')
+            s[i] = s[i] - 'A' + 'a';
+    }
+    return s;
+}
+
+static std::vector<std::string> split_tokens(const std::string &str, const char *delims)
+{
+    std::vector<std::string> out;
+    size_t start = 0;
+    while (start < str.size()) {
+        size_t pos = str.find_first_of(delims, start);
+        if (pos == std::string::npos) {
+            std::string tok = trim_str(str.substr(start));
+            if (!tok.empty())
+                out.push_back(tok);
+            break;
+        }
+        std::string tok = trim_str(str.substr(start, pos - start));
+        if (!tok.empty())
+            out.push_back(tok);
+        start = pos + 1;
+    }
+    return out;
+}
+
+static void parse_ip_spec_list(const std::string &spec,
+                               std::vector<uint32_t> &ips,
+                               std::vector<ipl_rangestruct> &ranges,
+                               std::vector<ipl_subnetstruct> &subnets)
+{
+    std::vector<std::string> tokens = split_tokens(spec, ",; ");
+    for (const auto &tok : tokens) {
+        size_t slash_pos = tok.find('/');
+        size_t dash_pos = tok.find('-');
+        if (slash_pos != std::string::npos) {
+            std::string ip_part = trim_str(tok.substr(0, slash_pos));
+            std::string mask_part = trim_str(tok.substr(slash_pos + 1));
+            struct in_addr addr;
+            if (inet_aton(ip_part.c_str(), &addr) == 0)
+                continue;
+            uint32_t host_ip = ntohl(addr.s_addr);
+            uint32_t mask = 0;
+            if (mask_part.find('.') != std::string::npos) {
+                struct in_addr maddr;
+                if (inet_aton(mask_part.c_str(), &maddr) == 0)
+                    continue;
+                mask = ntohl(maddr.s_addr);
+            } else {
+                int cidr = atoi(mask_part.c_str());
+                if (cidr < 0 || cidr > 32)
+                    continue;
+                mask = (cidr == 0) ? 0 : (0xFFFFFFFFu << (32 - cidr));
+            }
+            ipl_subnetstruct sub;
+            sub.mask = mask;
+            sub.maskedaddr = host_ip & mask;
+            subnets.push_back(sub);
+        } else if (dash_pos != std::string::npos) {
+            std::string start_part = trim_str(tok.substr(0, dash_pos));
+            std::string end_part = trim_str(tok.substr(dash_pos + 1));
+            struct in_addr saddr, eaddr;
+            if (inet_aton(start_part.c_str(), &saddr) != 0 && inet_aton(end_part.c_str(), &eaddr) != 0) {
+                ipl_rangestruct r;
+                r.startaddr = ntohl(saddr.s_addr);
+                r.endaddr = ntohl(eaddr.s_addr);
+                if (r.startaddr > r.endaddr)
+                    std::swap(r.startaddr, r.endaddr);
+                ranges.push_back(r);
+            }
+        } else {
+            struct in_addr addr;
+            if (inet_aton(tok.c_str(), &addr) != 0) {
+                ips.push_back(ntohl(addr.s_addr));
+            }
+        }
+    }
+    std::sort(ips.begin(), ips.end());
+}
+
+static bool match_ip_spec(const std::string &ip_str,
+                          const std::vector<uint32_t> &ips,
+                          const std::vector<ipl_rangestruct> &ranges,
+                          const std::vector<ipl_subnetstruct> &subnets)
+{
+    if (ip_str.empty())
+        return false;
+    struct in_addr addr;
+    if (inet_aton(ip_str.c_str(), &addr) == 0)
+        return false;
+    uint32_t ip = ntohl(addr.s_addr);
+    if (std::binary_search(ips.begin(), ips.end(), ip))
+        return true;
+    for (const auto &r : ranges) {
+        if (ip >= r.startaddr && ip <= r.endaddr)
+            return true;
+    }
+    for (const auto &s : subnets) {
+        if ((ip & s.mask) == s.maskedaddr)
+            return true;
+    }
+    return false;
+}
+
+static std::string lookup_interface_ipv4(const std::string &if_name)
+{
+    if (if_name.empty())
+        return "";
+    struct ifaddrs *ifaddr = nullptr;
+    if (getifaddrs(&ifaddr) == -1)
+        return "";
+    std::string result;
+    for (struct ifaddrs *ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
+        if (ifa->ifa_addr == nullptr || ifa->ifa_name == nullptr)
+            continue;
+        if (ifa->ifa_addr->sa_family == AF_INET && if_name == ifa->ifa_name) {
+            struct sockaddr_in *sin = (struct sockaddr_in *)ifa->ifa_addr;
+            char buf[INET_ADDRSTRLEN];
+            if (inet_ntop(AF_INET, &sin->sin_addr, buf, sizeof(buf)) != nullptr) {
+                result = buf;
+                break;
+            }
+        }
+    }
+    freeifaddrs(ifaddr);
+    return result;
+}
+
+void LOptionContainer::loadGatewayRules(const std::string &filename)
+{
+    gateway_rules.clear();
+    gateways_map.clear();
+    gateway_groups_map.clear();
+
+    if (filename.empty())
+        return;
+
+    std::ifstream infile(filename.c_str(), std::ios::in);
+    if (!infile.good()) {
+        return; // gatewayrules file is optional
+    }
+
+    std::string line;
+    while (std::getline(infile, line)) {
+        std::string trimmed = trim_str(line);
+        if (trimmed.empty() || trimmed[0] == '#')
+            continue;
+
+        std::vector<std::string> fields;
+        size_t start = 0;
+        while (true) {
+            size_t pos = trimmed.find('|', start);
+            if (pos == std::string::npos) {
+                fields.push_back(trim_str(trimmed.substr(start)));
+                break;
+            }
+            fields.push_back(trim_str(trimmed.substr(start, pos - start)));
+            start = pos + 1;
+        }
+        if (fields.empty())
+            continue;
+
+        std::string type = to_lower_str(fields[0]);
+        if (type == "gateway" && fields.size() >= 6) {
+            // GATEWAY|name|if_name|local_ip|gw_ip|tos|status
+            GatewayEndpoint ep;
+            ep.name = fields[1];
+            ep.if_name = fields[2];
+            ep.local_ip = fields[3];
+            ep.gw_ip = fields[4];
+            ep.tos = (int)strtol(fields[5].c_str(), nullptr, 0);
+            if (fields.size() >= 7) {
+                std::string st = to_lower_str(fields[6]);
+                ep.up = (st != "down" && st != "0" && st != "false" && st != "offline");
+            } else {
+                ep.up = true;
+            }
+            if ((ep.local_ip.empty() || ep.local_ip == "dynamic" || ep.local_ip == "0.0.0.0") && !ep.if_name.empty()) {
+                ep.local_ip = lookup_interface_ipv4(ep.if_name);
+            }
+            gateways_map[ep.name] = ep;
+        } else if (type == "gwgroup" && fields.size() >= 3) {
+            // GWGROUP|group_name|gw1:tier:weight:up,gw2:tier:weight:up
+            std::string gname = fields[1];
+            std::vector<GatewayEndpoint> group_eps;
+            std::vector<std::string> members = split_tokens(fields[2], ",");
+            for (const auto &m : members) {
+                std::vector<std::string> parts = split_tokens(m, ":");
+                if (parts.empty())
+                    continue;
+                std::string gw_name = parts[0];
+                int tier = (parts.size() >= 2) ? atoi(parts[1].c_str()) : 1;
+                int weight = (parts.size() >= 3) ? atoi(parts[2].c_str()) : 1;
+                if (tier < 1) tier = 1;
+                if (weight < 1) weight = 1;
+                bool member_up = true;
+                if (parts.size() >= 4) {
+                    std::string st = to_lower_str(parts[3]);
+                    member_up = (st != "down" && st != "0" && st != "false" && st != "offline");
+                }
+                auto it = gateways_map.find(gw_name);
+                if (it != gateways_map.end()) {
+                    GatewayEndpoint ep = it->second;
+                    ep.tier = tier;
+                    ep.weight = weight;
+                    ep.up = ep.up && member_up;
+                    group_eps.push_back(ep);
+                } else {
+                    GatewayEndpoint ep;
+                    ep.name = gw_name;
+                    ep.tier = tier;
+                    ep.weight = weight;
+                    ep.up = member_up;
+                    group_eps.push_back(ep);
+                }
+            }
+            gateway_groups_map[gname] = group_eps;
+        } else if (type == "rule" && fields.size() >= 6) {
+            // RULE|src_type|src_val|dst_type|dst_val|gateway|rule_name
+            GatewayRule rule;
+            std::string stype = to_lower_str(fields[1]);
+            std::string sval = fields[2];
+            std::string dtype = to_lower_str(fields[3]);
+            std::string dval = fields[4];
+            rule.gateway = fields[5];
+            if (fields.size() >= 7)
+                rule.name = fields[6];
+
+            if (stype == "ip") {
+                rule.src_type = GatewayRule::SRC_IP;
+                parse_ip_spec_list(sval, rule.src_ips, rule.src_ranges, rule.src_subnets);
+            } else if (stype == "user") {
+                rule.src_type = GatewayRule::SRC_USER;
+                std::vector<std::string> utoks = split_tokens(sval, ",;");
+                for (const auto &u : utoks) {
+                    std::string lu = to_lower_str(u);
+                    if (!lu.empty())
+                        rule.src_users.push_back(lu);
+                }
+            } else {
+                rule.src_type = GatewayRule::SRC_ANY;
+            }
+
+            if (dtype == "domain") {
+                rule.dst_type = GatewayRule::DST_DOMAIN;
+                std::vector<std::string> dtoks = split_tokens(dval, ",; ");
+                for (const auto &d : dtoks) {
+                    std::string ld = to_lower_str(d);
+                    if (ld.find("://") != std::string::npos)
+                        ld = ld.substr(ld.find("://") + 3);
+                    if (ld.find('/') != std::string::npos)
+                        ld = ld.substr(0, ld.find('/'));
+                    if (ld.find(':') != std::string::npos)
+                        ld = ld.substr(0, ld.find(':'));
+                    if (ld.empty())
+                        continue;
+                    if (ld.size() > 2 && ld[0] == '*' && ld[1] == '.') {
+                        rule.dst_domains_wild.push_back(ld.substr(2));
+                    } else if (ld.size() > 1 && ld[0] == '.') {
+                        rule.dst_domains_wild.push_back(ld.substr(1));
+                    } else {
+                        rule.dst_domains_exact.push_back(ld);
+                    }
+                }
+            } else if (dtype == "url") {
+                rule.dst_type = GatewayRule::DST_URL;
+                std::vector<std::string> utoks = split_tokens(dval, ",; ");
+                for (const auto &u : utoks) {
+                    std::string lu = to_lower_str(u);
+                    if (lu.find("://") != std::string::npos)
+                        lu = lu.substr(lu.find("://") + 3);
+                    while (!lu.empty() && lu.back() == '/')
+                        lu.pop_back();
+                    if (!lu.empty())
+                        rule.dst_urls.push_back(lu);
+                }
+            } else if (dtype == "ip") {
+                rule.dst_type = GatewayRule::DST_IP;
+                parse_ip_spec_list(dval, rule.dst_ips, rule.dst_ranges, rule.dst_subnets);
+            } else {
+                rule.dst_type = GatewayRule::DST_ANY;
+            }
+
+            gateway_rules.push_back(rule);
+        }
+    }
+
+    syslog(LOG_INFO, "Loaded %zu gateway definitions, %zu gateway groups, and %zu outbound gateway rules",
+           gateways_map.size(), gateway_groups_map.size(), gateway_rules.size());
+}
+
+std::string LOptionContainer::matchGatewayRule(const std::string &client_ip, const std::string &client_user,
+                                               const String &domain, const String &url, const std::string &dest_ip) const
+{
+    if (gateway_rules.empty())
+        return "";
+
+    std::string norm_user = to_lower_str(trim_str(client_user));
+    std::string short_user = norm_user;
+    size_t bslash = short_user.find_last_of('\\');
+    if (bslash != std::string::npos)
+        short_user = short_user.substr(bslash + 1);
+    size_t fslash = short_user.find_last_of('/');
+    if (fslash != std::string::npos)
+        short_user = short_user.substr(fslash + 1);
+    size_t atpos = short_user.find('@');
+    if (atpos != std::string::npos)
+        short_user = short_user.substr(0, atpos);
+
+    std::string norm_domain = to_lower_str(domain.c_str());
+    if (norm_domain.find(':') != std::string::npos)
+        norm_domain = norm_domain.substr(0, norm_domain.find(':'));
+
+    std::string norm_url = to_lower_str(url.c_str());
+    if (norm_url.find("://") != std::string::npos)
+        norm_url = norm_url.substr(norm_url.find("://") + 3);
+
+    for (const auto &rule : gateway_rules) {
+        // 1. Check Source
+        bool src_ok = false;
+        if (rule.src_type == GatewayRule::SRC_ANY) {
+            src_ok = true;
+        } else if (rule.src_type == GatewayRule::SRC_IP) {
+            src_ok = match_ip_spec(client_ip, rule.src_ips, rule.src_ranges, rule.src_subnets);
+        } else if (rule.src_type == GatewayRule::SRC_USER) {
+            if (!norm_user.empty() && norm_user != "-") {
+                for (const auto &ru : rule.src_users) {
+                    if (ru == norm_user || ru == short_user) {
+                        src_ok = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if (!src_ok)
+            continue;
+
+        // 2. Check Destination
+        bool dst_ok = false;
+        if (rule.dst_type == GatewayRule::DST_ANY) {
+            dst_ok = true;
+        } else if (rule.dst_type == GatewayRule::DST_DOMAIN) {
+            if (!norm_domain.empty()) {
+                for (const auto &ed : rule.dst_domains_exact) {
+                    if (norm_domain == ed) {
+                        dst_ok = true;
+                        break;
+                    }
+                }
+                if (!dst_ok) {
+                    for (const auto &wd : rule.dst_domains_wild) {
+                        if (norm_domain == wd) {
+                            dst_ok = true;
+                            break;
+                        }
+                        if (norm_domain.size() > wd.size() + 1 &&
+                            norm_domain[norm_domain.size() - wd.size() - 1] == '.' &&
+                            norm_domain.compare(norm_domain.size() - wd.size(), wd.size(), wd) == 0) {
+                            dst_ok = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        } else if (rule.dst_type == GatewayRule::DST_URL) {
+            if (!norm_url.empty()) {
+                for (const auto &u : rule.dst_urls) {
+                    if (norm_url.compare(0, u.size(), u) == 0) {
+                        if (norm_url.size() == u.size() ||
+                            norm_url[u.size()] == '/' ||
+                            norm_url[u.size()] == '?' ||
+                            norm_url[u.size()] == '&' ||
+                            norm_url[u.size()] == ':') {
+                            dst_ok = true;
+                            break;
+                        }
+                    }
+                    // Also check if URL pattern has no path and matches subdomain prefix or substring
+                    size_t pos = norm_url.find(u);
+                    if (pos != std::string::npos) {
+                        bool left_ok = (pos == 0 || norm_url[pos - 1] == '.');
+                        size_t end_pos = pos + u.size();
+                        bool right_ok = (end_pos == norm_url.size() ||
+                                         norm_url[end_pos] == '/' ||
+                                         norm_url[end_pos] == '?' ||
+                                         norm_url[end_pos] == '&' ||
+                                         norm_url[end_pos] == ':');
+                        if (left_ok && right_ok) {
+                            dst_ok = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        } else if (rule.dst_type == GatewayRule::DST_IP) {
+            dst_ok = match_ip_spec(dest_ip, rule.dst_ips, rule.dst_ranges, rule.dst_subnets);
+            if (!dst_ok && !norm_domain.empty() && norm_domain != dest_ip) {
+                dst_ok = match_ip_spec(norm_domain, rule.dst_ips, rule.dst_ranges, rule.dst_subnets);
+            }
+        }
+
+        if (dst_ok) {
+            return rule.gateway;
+        }
+    }
+
+    return "";
+}
+
+std::vector<GatewayEndpoint> LOptionContainer::getGatewayEndpoints(const std::string &gw_name) const
+{
+    std::vector<GatewayEndpoint> result;
+    if (gw_name.empty() || gw_name == "default" || gw_name == "DEFAULT")
+        return result;
+
+    auto git = gateways_map.find(gw_name);
+    if (git != gateways_map.end()) {
+        GatewayEndpoint ep = git->second;
+        if (ep.local_ip.empty() && !ep.if_name.empty()) {
+            ep.local_ip = lookup_interface_ipv4(ep.if_name);
+        }
+        result.push_back(ep);
+        return result;
+    }
+
+    auto gpit = gateway_groups_map.find(gw_name);
+    if (gpit != gateway_groups_map.end()) {
+        const auto &members = gpit->second;
+        std::map<int, std::vector<GatewayEndpoint>> tiers_up;
+        std::map<int, std::vector<GatewayEndpoint>> tiers_down;
+        for (auto ep : members) {
+            auto mgit = gateways_map.find(ep.name);
+            if (mgit != gateways_map.end()) {
+                ep.if_name = mgit->second.if_name;
+                ep.local_ip = mgit->second.local_ip;
+                ep.gw_ip = mgit->second.gw_ip;
+                ep.tos = mgit->second.tos;
+                ep.up = ep.up && mgit->second.up;
+            }
+            if (ep.local_ip.empty() && !ep.if_name.empty()) {
+                ep.local_ip = lookup_interface_ipv4(ep.if_name);
+            }
+            if (ep.up) {
+                tiers_up[ep.tier].push_back(ep);
+            } else {
+                tiers_down[ep.tier].push_back(ep);
+            }
+        }
+
+        uint32_t seq = gw_rr_counter.fetch_add(1, std::memory_order_relaxed);
+        auto append_tier = [&](const std::vector<GatewayEndpoint> &tier_eps) {
+            if (tier_eps.empty())
+                return;
+            if (tier_eps.size() == 1) {
+                result.push_back(tier_eps[0]);
+                return;
+            }
+            int total_weight = 0;
+            for (const auto &e : tier_eps) {
+                total_weight += (e.weight > 0 ? e.weight : 1);
+            }
+            int pick = (total_weight > 0) ? (int)(seq % (uint32_t)total_weight) : 0;
+            size_t primary_idx = 0;
+            int accum = 0;
+            for (size_t i = 0; i < tier_eps.size(); ++i) {
+                accum += (tier_eps[i].weight > 0 ? tier_eps[i].weight : 1);
+                if (pick < accum) {
+                    primary_idx = i;
+                    break;
+                }
+            }
+            result.push_back(tier_eps[primary_idx]);
+            for (size_t i = 1; i < tier_eps.size(); ++i) {
+                size_t idx = (primary_idx + i) % tier_eps.size();
+                result.push_back(tier_eps[idx]);
+            }
+        };
+
+        for (const auto &kv : tiers_up) {
+            append_tier(kv.second);
+        }
+        for (const auto &kv : tiers_down) {
+            append_tier(kv.second);
+        }
+    }
+
+    return result;
+}
+

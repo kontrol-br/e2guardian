@@ -174,6 +174,7 @@ class ConnectionHandler
     int connectUpstream(Socket &sock, NaughtyFilter &cm,int port);
 };
 
+bool get_TLS_SNI(const char *inbytes, int len, std::string &sni);
 char *get_TLS_SNI(char *bytes, int* len);
 
 #endif

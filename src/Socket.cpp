@@ -188,11 +188,19 @@ void Socket::reset() {
 
     chunkError = false;
     chunk_to_read = 0;
+    bound_local_ip.clear();
+    bound_tos = -1;
+    connected_gateway.clear();
 
 }
 
 // connect to given IP & port (following default constructor)
 int Socket::connect(const std::string &ip, int port) {
+    return connect(ip, port, "", -1);
+}
+
+// connect to given IP & port binding to a specific local IP and/or setting IP_TOS
+int Socket::connect(const std::string &ip, int port, const std::string &local_ip, int tos) {
     reset();   // do it anyway as we need sck to be allocated
 
     if (sck < 0) // socket creation error
@@ -201,6 +209,25 @@ int Socket::connect(const std::string &ip, int port) {
     }
 
     int len = sizeof my_adr;
+    if (!local_ip.empty() && local_ip != "0.0.0.0") {
+        int reuse = 1;
+        setsockopt(sck, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
+        my_adr.sin_family = AF_INET;
+        my_adr.sin_port = htons(0);
+        if (inet_aton(local_ip.c_str(), &my_adr.sin_addr) == 0 ||
+            ::bind(sck, (struct sockaddr *) &my_adr, len) < 0) {
+            s_errno = errno;
+            close();
+            return -1;
+        }
+        bound_local_ip = local_ip;
+    }
+    if (tos > 0) {
+        if (setsockopt(sck, IPPROTO_IP, IP_TOS, &tos, sizeof(tos)) == 0) {
+            bound_tos = tos;
+        }
+    }
+
     peer_adr.sin_port = htons(port);
     inet_aton(ip.c_str(), &peer_adr.sin_addr);
     my_port = port;

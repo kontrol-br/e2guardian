@@ -481,7 +481,7 @@ int ipinstance::init(void *args)
             ipgroups_reload_id_ = -1;
     }
 
-    if (new_iplist.empty() && new_ipsubnetlist.empty() && new_iprangelist.empty()) {
+    if (iplist.empty() && ipsubnetlist.empty() && iprangelist.empty()) {
         // DEBUG INVESTIGATION (group drift): captures filesystem metadata when
         // initial plugin load yields an unexpectedly empty ipgroups map.
         std::string meta = ipgroups_file_metadata(ipgroups_path_value);

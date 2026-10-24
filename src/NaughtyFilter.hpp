@@ -171,6 +171,8 @@ class NaughtyFilter
     std::string whatIsNaughtyDisplayCategories;
     std::string clienthost;
     std::string clientip;
+    std::string gateway_name;
+    std::string gateway_ip;
 
     NaughtyFilter();
     NaughtyFilter(HTTPHeader &request, HTTPHeader &response);

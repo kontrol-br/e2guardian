@@ -1438,9 +1438,14 @@ void accept_connections(int index) // thread to listen on a single listening soc
 #ifdef E2DEBUG
                 std::cerr << thread_id << "Error on accept: errorcount " << errorcount << " errno: " << err << std::endl;
 #endif
-                syslog(LOG_ERR, "%sError %d on accept: errorcount %d", thread_id.c_str(), err, errorcount);
-                ++errorcount;
-                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                if (err == ECONNABORTED || err == EINTR || err == EAGAIN || err == EWOULDBLOCK) {
+                    if (o.logconerror)
+                        syslog(LOG_INFO, "%sTransient error %d on accept: errorcount %d (ignorable)", thread_id.c_str(), err, errorcount);
+                } else {
+                    syslog(LOG_ERR, "%sError %d on accept: errorcount %d", thread_id.c_str(), err, errorcount);
+                    ++errorcount;
+                    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                }
             }
         };
         if (!ttg) syslog(LOG_ERR, "%sError count on accept exceeds 30", thread_id.c_str());
