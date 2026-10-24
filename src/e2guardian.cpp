@@ -195,6 +195,12 @@ int main(int argc, char *argv[])
       openlog(prog_name.c_str(), LOG_PID | LOG_CONS, LOG_USER);
     }
 
+    if (sysv_amirunning(o.pid_filename)) {
+        syslog(LOG_ERR, "%s", "I seem to be running already!");
+        std::cerr << "I seem to be running already!" << std::endl;
+        return 1;
+    }
+
     if (total_block_list && !o.readinStdin()) {
         syslog(LOG_ERR, "%s", "Error on reading total_block_list");
         std::cerr << "Error on reading total_block_list" << std::endl;

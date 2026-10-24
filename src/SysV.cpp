@@ -250,7 +250,8 @@ int sysv_writepidfile(int pidfilefd)
 // check process in pidfile is running
 bool sysv_amirunning(std::string pidfile)
 {
-    if (getpid(pidfile) > 1) {
+    pid_t p = getpid(pidfile);
+    if (p > 1 && p != ::getpid()) {
         return true;
     }
     return false;
