@@ -80,6 +80,9 @@ class ConnectionHandler
     String lastcategory;
     std::shared_ptr<LOptionContainer> ldl;
 
+    FOptionContainer *getFG(int fg) const;
+    FOptionContainer *currentFG() const { return getFG(filtergroup); }
+
     void peerDiag(const char *message, Socket &peersock );
     void upstreamDiag(const char *message, Socket &proxysock );
 

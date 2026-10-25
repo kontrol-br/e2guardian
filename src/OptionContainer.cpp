@@ -1509,6 +1509,7 @@ bool OptionContainer::loadAuthPlugins() {
 bool OptionContainer::createLists(int load_id) {
     std::shared_ptr<LOptionContainer> temp(new LOptionContainer(load_id));
     if (temp->loaded_ok) {
+        std::lock_guard<std::mutex> lock(current_loc_mutex);
         current_LOC = temp;
         return true;
     }
@@ -1517,5 +1518,6 @@ bool OptionContainer::createLists(int load_id) {
 
 
 std::shared_ptr<LOptionContainer> OptionContainer::currentLists() {
+    std::lock_guard<std::mutex> lock(current_loc_mutex);
     return current_LOC;
 }

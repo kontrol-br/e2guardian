@@ -1199,7 +1199,7 @@ void log_listener(std::string log_location, bool is_RQlog, bool logsyslog, Queue
 
 #ifdef ENABLE_EMAIL
         // do the notification work here, but fork for speed
-        if (filtergroup >= 0 && ldl->fg[filtergroup]->use_smtp == true) {
+        if (filtergroup >= 0 && ldl && filtergroup < ldl->numfg && ldl->fg && ldl->fg[filtergroup] && ldl->fg[filtergroup]->use_smtp == true) {
 
             // run through the gambit to find out of we're sending notification
             // because if we're not.. then fork()ing is a waste of time.

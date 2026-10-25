@@ -24,6 +24,7 @@
 #include "DebugManager.hpp"
 #include <deque>
 #include <atomic>
+#include <mutex>
 
 #ifdef __SSLMITM
 #include "CertificateAuthority.hpp"
@@ -270,6 +271,7 @@ class OptionContainer
     std::atomic<int> LC_cnt;
 
     //LOptionContainer* current_LOC;
+    mutable std::mutex current_loc_mutex;
     std::shared_ptr<LOptionContainer> current_LOC;
     std::string conffilename;
  //   std::string html_template_location;
